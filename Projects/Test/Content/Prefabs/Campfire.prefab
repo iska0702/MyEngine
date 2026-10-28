@@ -1,0 +1,42 @@
+# MyEngine Prefab Archetype Definition
+[PREFAB]
+name = Campfire
+guid = c2b02c33-5f90-4e88-9b02-8b8c64da2202
+version = 1
+
+[NODE]
+name = Campfire_Root
+tag = Prop_Fire
+pos = 0 0 0
+rot = 0 0 0
+scale = 1 1 1
+  [NODE]
+  name = StoneRing
+  tag = Prop
+  pos = 0 0.1 0
+  rot = 0 0 0
+  scale = 1.2 0.2 1.2
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 0.35 0.33 0.3 1
+  roughness = 0.9
+  [END_NODE]
+  [NODE]
+  name = Embers
+  tag = Prop_Fire
+  pos = 0 0.25 0
+  rot = 0 0 0
+  scale = 0.5 0.25 0.5
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 1 0.4 0.1 1
+  emissive = 1 0.35 0.05
+  emissive_intensity = 5
+  has_light = 1
+  light_type = Point
+  light_color = 1 0.45 0.15
+  light_intensity = 4.5
+  light_radius = 10
+  light_offset = 0 0 0
+  [END_NODE]
+[END_NODE]

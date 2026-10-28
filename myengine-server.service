@@ -1,0 +1,17 @@
+[Unit]
+Description=MyEngine Dedicated Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=gameserver
+WorkingDirectory=/opt/myengine
+ExecStart=/opt/myengine/bin/MyEngineServer --port 7777 --config /opt/myengine/server.cfg
+Restart=always
+RestartSec=5s
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tab Меню — Idontknow</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme tab-menu-standalone-body">
+  <!-- Dynamic Background Canvas (Atmosphere) -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- TAB MENU FULLSCREEN CONTAINER -->
+  <div id="tab-menu-overlay" class="overlay-screen active standalone">
+    <div class="tab-menu-window">
+      
+      <!-- Top Navigation Tabs Bar -->
+      <header class="tab-nav-header">
+        <div class="tab-header-left">
+          <div class="header-logo-badge">
+            <span class="logo-icon">◈</span>
+            <span class="logo-text">Idontknow</span>
+          </div>
+        </div>
+
+        <nav class="tab-buttons-bar">
+          <button class="tab-nav-btn active" data-tab="inventory">
+            <span class="tab-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="13" rx="2"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/><line x1="12" y1="12" x2="12" y2="15"/></svg>
+            </span>
+            <span class="tab-title">Инвентарь</span>
+            <span class="tab-key-hint">I</span>
+          </button>
+
+          <button class="tab-nav-btn" data-tab="map">
+            <span class="tab-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            </span>
+            <span class="tab-title">Карта мира</span>
+            <span class="tab-key-hint">M</span>
+          </button>
+
+          <button class="tab-nav-btn" data-tab="character">
+            <span class="tab-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            <span class="tab-title">Персонаж</span>
+            <span class="tab-key-hint">C</span>
+          </button>
+
+          <button class="tab-nav-btn" data-tab="settings">
+            <span class="tab-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </span>
+            <span class="tab-title">Настройки</span>
+            <span class="tab-key-hint">O</span>
+          </button>
+        </nav>
+
+        <div class="tab-header-right">
+          <button class="tab-close-btn" id="btn-close-tab-menu">
+            <span class="btn-text">В Игру</span>
+            <kbd class="kbd-badge">ESC</kbd>
+          </button>
+        </div>
+      </header>
+
+      <!-- TAB CONTENT PANELS -->
+      <main class="tab-main-content">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: INVENTORY (ИНВЕНТАРЬ)               -->
+        <!-- ========================================== -->
+        <section id="tab-inventory" class="tab-panel active">
+          <div class="inventory-layout">
+
+            <!-- Left: Hero Equipment Slots -->
+            <div class="equipment-panel">
+              <div class="equip-header">
+                <h3>Снаряжение героя</h3>
+                <div class="power-score-badge">
+                  <span>Мощь:</span>
+                  <strong id="gear-power-score">0</strong>
+                </div>
+              </div>
+
+              <div class="equipment-grid">
+                <div class="equip-slot" data-slot="head" title="Шлем">
+                  <div class="slot-icon" id="slot-head"></div>
+                  <span class="slot-label">Голова</span>
+                </div>
+                <div class="equip-slot" data-slot="chest" title="Доспех">
+                  <div class="slot-icon" id="slot-chest"></div>
+                  <span class="slot-label">Тело</span>
+                </div>
+                <div class="equip-slot" data-slot="gloves" title="Перчатки">
+                  <div class="slot-icon" id="slot-gloves"></div>
+                  <span class="slot-label">Руки</span>
+                </div>
+                <div class="equip-slot" data-slot="boots" title="Сапоги">
+                  <div class="slot-icon" id="slot-boots"></div>
+                  <span class="slot-label">Ноги</span>
+                </div>
+                <div class="equip-slot" data-slot="mainhand" title="Основное оружие">
+                  <div class="slot-icon" id="slot-mainhand"></div>
+                  <span class="slot-label">Оружие</span>
+                </div>
+                <div class="equip-slot" data-slot="offhand" title="Щит / Вторая рука">
+                  <div class="slot-icon" id="slot-offhand"></div>
+                  <span class="slot-label">Левая рука</span>
+                </div>
+                <div class="equip-slot" data-slot="amulet" title="Амулет">
+                  <div class="slot-icon" id="slot-amulet"></div>
+                  <span class="slot-label">Амулет</span>
+                </div>
+                <div class="equip-slot" data-slot="ring" title="Кольцо">
+                  <div class="slot-icon" id="slot-ring"></div>
+                  <span class="slot-label">Кольцо</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Middle: Backpack & Grid -->
+            <div class="backpack-panel">
+              <div class="backpack-toolbar">
+                <div class="inv-category-filters" id="inv-category-filters">
+                  <button class="cat-btn active" data-category="all">Все</button>
+                  <button class="cat-btn" data-category="weapon">Оружие</button>
+                  <button class="cat-btn" data-category="armor">Броня</button>
+                  <button class="cat-btn" data-category="consumable">Зелья</button>
+                  <button class="cat-btn" data-category="misc">Разное</button>
+                </div>
+
+                <div class="inv-actions-right">
+                  <input type="text" class="inv-search-input" id="inv-search-input" placeholder="Поиск предметов...">
+                  <button class="cat-btn" id="btn-sort-inv" title="Сортировать по ценности">Сортировка</button>
+                </div>
+              </div>
+
+              <div class="inventory-status-bar">
+                <div class="weight-capacity-box">
+                  <span class="weight-label">Вес рюкзака:</span>
+                  <span class="weight-value" id="weight-text">0.0 / 100.0 кг</span>
+                  <div class="weight-track">
+                    <div class="weight-fill" id="weight-bar" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="gold-balance-box">
+                  <span class="gold-symbol">✦</span>
+                  <span class="gold-amount" id="inv-gold-amount">0</span>
+                  <span class="gold-currency">G</span>
+                </div>
+              </div>
+
+              <!-- Item Grid -->
+              <div class="inventory-grid-wrapper">
+                <div class="inventory-grid" id="inventory-grid"></div>
+              </div>
+            </div>
+
+            <!-- Right: Item Detail / Inspector Panel -->
+            <div class="item-inspector-panel" id="item-inspector-panel">
+              <div class="empty-inspector-placeholder" id="inspector-placeholder">
+                <div class="placeholder-svg">
+                  <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <h4>Выберите предмет</h4>
+                <p>Нажмите на ячейку в инвентаре для просмотра характеристик, экипировки или применения.</p>
+              </div>
+
+              <div class="inspector-card hidden" id="inspector-card">
+                <div class="item-header-banner" id="insp-header-banner">
+                  <div class="item-icon-box" id="insp-icon-box"></div>
+                  <div class="item-title-meta">
+                    <h3 id="insp-name">Название предмета</h3>
+                    <div class="item-sub-meta">
+                      <span class="rarity-tag" id="insp-rarity">Обычный</span>
+                      <span class="type-tag" id="insp-type">Тип</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="item-body-details">
+                  <div class="item-primary-stat" id="insp-primary-stat">
+                    <span class="primary-num">0</span>
+                    <span class="primary-label">Параметр</span>
+                  </div>
+
+                  <div class="item-stats-list" id="insp-stats-list"></div>
+
+                  <div class="item-lore-desc" id="insp-lore">
+                    Описание предмета.
+                  </div>
+
+                  <div class="item-specs-footer">
+                    <div>Уровень: <strong id="insp-req-lvl">1</strong></div>
+                    <div>Вес: <strong id="insp-weight">0.0 кг</strong></div>
+                    <div>Цена: <strong id="insp-price">0 G</strong></div>
+                  </div>
+                </div>
+
+                <div class="item-actions-panel" id="insp-actions">
+                  <button class="action-btn equip-btn" id="btn-equip-item">Экипировать</button>
+                  <button class="action-btn use-btn hidden" id="btn-use-item">Использовать</button>
+                  <button class="action-btn drop-btn" id="btn-drop-item">Выбросить</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: WORLD MAP (КАРТА МИРА)              -->
+        <!-- ========================================== -->
+        <section id="tab-map" class="tab-panel">
+          <div class="map-layout">
+            <div class="map-canvas-container" id="map-container">
+              <canvas id="world-map-canvas"></canvas>
+              
+              <!-- Floating Map Controls -->
+              <div class="map-floating-controls">
+                <button class="map-btn" id="btn-map-zoom-in" title="Приблизить">+</button>
+                <button class="map-btn" id="btn-map-zoom-out" title="Отдалить">−</button>
+                <button class="map-btn" id="btn-map-recenter" title="Центр на игроке">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                </button>
+                <button class="map-btn" id="btn-map-fullscreen" title="Сбросить вид">↺</button>
+              </div>
+            </div>
+
+            <!-- Right POI & Fast Travel Sidebar -->
+            <div class="poi-sidebar">
+              <div class="poi-header">
+                <h3>Точки интереса</h3>
+                <div class="region-badge" id="current-region-name">Королевство Эфирия</div>
+              </div>
+
+              <div class="poi-category-tabs">
+                <button class="poi-tab active" data-filter="all">Все</button>
+                <button class="poi-tab" data-filter="town">Города</button>
+                <button class="poi-tab" data-filter="dungeon">Подземелья</button>
+                <button class="poi-tab" data-filter="quest">Задания</button>
+              </div>
+
+              <div class="poi-list-container" id="poi-list-container"></div>
+
+              <div class="poi-detail-card hidden" id="poi-detail-card">
+                <div class="poi-card-header">
+                  <div class="poi-card-icon" id="poi-card-icon"></div>
+                  <div>
+                    <h4 id="poi-card-title">Локация</h4>
+                    <span class="poi-card-type" id="poi-card-type">ГОРОД</span>
+                  </div>
+                </div>
+                <p id="poi-card-desc" class="poi-card-desc">Описание локации.</p>
+                <button class="action-btn fast-travel-btn" id="btn-fast-travel">
+                  <span>Быстрое перемещение</span>
+                  <span class="cost-tag">0 G</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: CHARACTER STATS (ПЕРСОНАЖ)          -->
+        <!-- ========================================== -->
+        <section id="tab-character" class="tab-panel">
+          <div class="character-layout">
+            
+            <div class="char-profile-card">
+              <div class="profile-avatar-large">
+                <div class="avatar-hero-symbol">
+                  <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#d97706" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <div class="level-circle" id="char-level-badge">1</div>
+              </div>
+              <div class="profile-info">
+                <h2 id="char-name-heading">Игрок</h2>
+                <div class="title-row">
+                  <span class="char-class-badge" id="char-class-badge">Странник</span>
+                  <span class="char-title-badge" id="char-title-badge">Новичок</span>
+                </div>
+                <div class="xp-bar-container">
+                  <div class="xp-labels">
+                    <span>Опыт уровня</span>
+                    <span id="char-xp-text">0 / 1,000 XP (0%)</span>
+                  </div>
+                  <div class="xp-bar-bg">
+                    <div class="xp-bar-fill" id="char-xp-bar" style="width: 0%;"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="attribute-points-box">
+                <span class="pts-label">Свободные очки:</span>
+                <span class="pts-val" id="free-stat-points">0</span>
+              </div>
+            </div>
+
+            <!-- Stats Two Columns -->
+            <div class="stats-two-col">
+              <div class="stats-card">
+                <div class="card-title">
+                  <h3>Основные атрибуты</h3>
+                </div>
+                <div class="attr-table">
+                  <div class="attr-row">
+                    <div class="attr-name"><span>Сила (STR)</span></div>
+                    <div class="attr-control">
+                      <span class="attr-val" id="stat-str">10</span>
+                      <button class="add-stat-btn" data-stat="str">+</button>
+                    </div>
+                  </div>
+                  <div class="attr-row">
+                    <div class="attr-name"><span>Ловкость (DEX)</span></div>
+                    <div class="attr-control">
+                      <span class="attr-val" id="stat-dex">10</span>
+                      <button class="add-stat-btn" data-stat="dex">+</button>
+                    </div>
+                  </div>
+                  <div class="attr-row">
+                    <div class="attr-name"><span>Интеллект (INT)</span></div>
+                    <div class="attr-control">
+                      <span class="attr-val" id="stat-int">10</span>
+                      <button class="add-stat-btn" data-stat="int">+</button>
+                    </div>
+                  </div>
+                  <div class="attr-row">
+                    <div class="attr-name"><span>Живучесть (VIT)</span></div>
+                    <div class="attr-control">
+                      <span class="attr-val" id="stat-vit">10</span>
+                      <button class="add-stat-btn" data-stat="vit">+</button>
+                    </div>
+                  </div>
+                  <div class="attr-row">
+                    <div class="attr-name"><span>Удача (LCK)</span></div>
+                    <div class="attr-control">
+                      <span class="attr-val" id="stat-lck">10</span>
+                      <button class="add-stat-btn" data-stat="lck">+</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stats-card">
+                <div class="card-title">
+                  <h3>Боевые параметры</h3>
+                </div>
+                <div class="combat-stats-grid">
+                  <div class="combat-stat-item">
+                    <span class="lbl">Макс. Здоровье (HP)</span>
+                    <span class="val" id="c-stat-hp">100</span>
+                  </div>
+                  <div class="combat-stat-item">
+                    <span class="lbl">Макс. Мана (MP)</span>
+                    <span class="val" id="c-stat-mp">50</span>
+                  </div>
+                  <div class="combat-stat-item">
+                    <span class="lbl">Физ. Атака</span>
+                    <span class="val" id="c-stat-atk">10 - 15</span>
+                  </div>
+                  <div class="combat-stat-item">
+                    <span class="lbl">Магич. Урон</span>
+                    <span class="val" id="c-stat-matk">10</span>
+                  </div>
+                  <div class="combat-stat-item">
+                    <span class="lbl">Физич. Защита</span>
+                    <span class="val" id="c-stat-armor">10</span>
+                  </div>
+                  <div class="combat-stat-item">
+                    <span class="lbl">Магич. Сопротивление</span>
+                    <span class="val" id="c-stat-mres">5%</span>
+                  </div>
+                  <div class="combat-stat-item">
+                    <span class="lbl">Критический шанс</span>
+                    <span class="val" id="c-stat-crit">5%</span>
+                  </div>
+                  <div class="combat-stat-item">
+                    <span class="lbl">Скорость передвижения</span>
+                    <span class="val" id="c-stat-speed">100%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Passive Abilities -->
+            <div class="perks-panel">
+              <div class="card-title">
+                <h3>Пассивные таланты и способности</h3>
+              </div>
+              <div class="perks-grid" id="perks-container">
+                <div class="perk-card active">
+                  <div class="perk-icon-svg">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#d97706" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  </div>
+                  <div class="perk-meta">
+                    <h4>Благословение Света (Tier I)</h4>
+                    <p>Увеличивает восстановление здоровья и маны на 15% вне боя.</p>
+                  </div>
+                </div>
+                <div class="perk-card active">
+                  <div class="perk-icon-svg">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0284c7" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  </div>
+                  <div class="perk-meta">
+                    <h4>Эфирный Порыв (Tier I)</h4>
+                    <p>Снижает расход выносливости при беге и прыжках на 20%.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: SETTINGS (CLEAN GROUPED TABS)       -->
+        <!-- ========================================== -->
+        <section id="tab-settings" class="tab-panel">
+          <div class="settings-layout">
+            
+            <!-- Settings Categories Sidebar -->
+            <div class="settings-sidebar">
+              <button class="settings-sub-btn active" data-subtab="display">Дисплей</button>
+              <button class="settings-sub-btn" data-subtab="graphics">Графика</button>
+              <button class="settings-sub-btn" data-subtab="audio">Звук</button>
+              <button class="settings-sub-btn" data-subtab="gameplay">Геймплей & Управление</button>
+            </div>
+
+            <!-- Settings Panels Container -->
+            <div class="settings-content-area">
+              
+              <!-- 1. DISPLAY -->
+              <div class="settings-subpanel active" id="subpanel-display">
+                <h3>Настройки дисплея и экрана</h3>
+                
+                <div class="settings-group-header">Экран и рендер</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Режим экрана</label>
+                      <span>Формат окна игры</span>
+                    </div>
+                    <select class="setting-control" id="set-display-mode">
+                      <option value="fullscreen">Полноэкранный (Fullscreen)</option>
+                      <option value="borderless">В окне без рамок (Borderless)</option>
+                      <option value="windowed">Оконный режим (Windowed)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Разрешение рендера</label>
+                      <span>Разрешение монитора</span>
+                    </div>
+                    <select class="setting-control" id="set-resolution">
+                      <option value="3840x2160">3840 × 2160 (4K UHD)</option>
+                      <option value="2560x1440" selected>2560 × 1440 (2K QHD)</option>
+                      <option value="1920x1080">1920 × 1080 (FHD 1080p)</option>
+                      <option value="1280x720">1280 × 720 (HD 720p)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Частота обновления (Hz)</label>
+                      <span>Герцовка монитора</span>
+                    </div>
+                    <select class="setting-control" id="set-refresh-rate">
+                      <option value="240">240 Hz</option>
+                      <option value="165">165 Hz</option>
+                      <option value="144" selected>144 Hz</option>
+                      <option value="120">120 Hz</option>
+                      <option value="60">60 Hz</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Вертикальная синхронизация (V-Sync)</label>
+                      <span>Синхронизация кадров</span>
+                    </div>
+                    <select class="setting-control" id="set-vsync">
+                      <option value="off" selected>Выключено (Минимальный Input Lag)</option>
+                      <option value="on">Включено (Adaptive V-Sync)</option>
+                      <option value="triple">Тройная буферизация</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Ограничение частоты кадров (FPS Lock)</label>
+                      <span>Целевой FPS</span>
+                    </div>
+                    <select class="setting-control" id="set-fps-limit">
+                      <option value="unlimited">Без ограничений</option>
+                      <option value="240">240 FPS</option>
+                      <option value="144" selected>144 FPS</option>
+                      <option value="120">120 FPS</option>
+                      <option value="60">60 FPS</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Поле зрения камеры (FOV)</label>
+                      <span>Угол обзора игрока</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="set-fov" min="70" max="120" value="95">
+                      <span class="range-val" id="val-set-fov">95°</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">Масштабирование & Сглаживание</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Технология масштабирования <span class="tech-badge">AI SuperRes</span></label>
+                      <span>Аппаратный суперсемплинг нейросетями</span>
+                    </div>
+                    <select class="setting-control" id="set-upscaler-tech">
+                      <option value="dlss">NVIDIA DLSS 4.5 (Neural Super Resolution)</option>
+                      <option value="fsr" selected>AMD FSR (Super Resolution)</option>
+                      <option value="off">Выключено (Нативное)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Профиль масштабирования</label>
+                      <span>Коэффициент внутреннего разрешения</span>
+                    </div>
+                    <select class="setting-control" id="set-upscaler-mode">
+                      <option value="dlaa">DLSS 4.5 DLAA / 100% Native AI</option>
+                      <option value="ultra_quality">Ультра-качество (85%)</option>
+                      <option value="quality" selected>Качество (Quality 67%)</option>
+                      <option value="balanced">Баланс (Balanced 58%)</option>
+                      <option value="performance">Производительность (50%)</option>
+                      <option value="ultra_performance">Ультра-производительность (33%)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Мульти-генерация кадров (MFG) <span class="tech-badge gold">2x-4x FPS</span></label>
+                      <span>Интерполяция оптического потока GPU</span>
+                    </div>
+                    <select class="setting-control" id="set-frame-gen-mode">
+                      <option value="dlss_mfg_4x">NVIDIA DLSS 4.5 Multi-Frame Gen (4x кадров)</option>
+                      <option value="dlss_mfg_3x">NVIDIA DLSS 4.5 Multi-Frame Gen (3x кадров)</option>
+                      <option value="dlss_fg_2x" selected>NVIDIA DLSS 4.5 Frame Gen (2x кадров)</option>
+                      <option value="amd_afmf_2">AMD Fluid Motion Frames 2 (AFMF 2)</option>
+                      <option value="off">Выключено</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>NVIDIA Reflex / AMD Anti-Lag 2 <span class="tech-badge">Low Latency</span></label>
+                      <span>Снижение задержки ввода</span>
+                    </div>
+                    <select class="setting-control" id="set-reflex">
+                      <option value="off">Выкл</option>
+                      <option value="on">Вкл</option>
+                      <option value="boost" selected>Вкл + Boost</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>DLSS 4.5 Ray Reconstruction <span class="tech-badge green">DLSS 4.5 AI v2.0</span></label>
+                      <span>Нейросетевое восстановление лучей и отражений (Transformer 2.0)</span>
+                    </div>
+                    <select class="setting-control" id="set-dlss-ray-recon">
+                      <option value="v2" selected>DLSS 4.5 Ray Reconstruction 2.0 (Transformer v2.0)</option>
+                      <option value="v1">DLSS 4.5 Ray Reconstruction 1.0 (Classic Model)</option>
+                      <option value="off">Выключено</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Резкость масштабирования (Sharpening)</label>
+                      <span>Адаптивное повышение резкости деталей</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="set-upscale-sharpness" min="0" max="100" value="65">
+                      <span class="range-val" id="val-set-sharpness">65%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">HDR & Яркость</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Режим HDR (High Dynamic Range)</label>
+                      <span>Расширенный динамический диапазон яркости</span>
+                    </div>
+                    <select class="setting-control" id="set-hdr-mode">
+                      <option value="off" selected>Выключено (SDR sRGB)</option>
+                      <option value="hdr10">HDR10 (ScRGB 10-bit)</option>
+                      <option value="hdr10plus">HDR10+ Gaming</option>
+                      <option value="dolby">Dolby Vision Gaming</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Пиковая яркость HDR (Peak Brightness)</label>
+                      <span>Максимальная яркость дисплея</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="set-hdr-nits" min="400" max="2000" step="50" value="1000">
+                      <span class="range-val" id="val-set-hdr-nits">1000 nits</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. GRAPHICS -->
+              <div class="settings-subpanel" id="subpanel-graphics">
+                <h3>Качество графики</h3>
+
+                <div class="settings-group-header">Общий профиль</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Общий пресет графики</label>
+                      <span>Комплексный уровень детализации</span>
+                    </div>
+                    <select class="setting-control" id="set-graphics-preset">
+                      <option value="cinematic">Кинематографический (Cinematic)</option>
+                      <option value="ultra" selected>Ультра (Ultra)</option>
+                      <option value="high">Высокое (High)</option>
+                      <option value="medium">Среднее (Medium)</option>
+                      <option value="low">Низкое (Low)</option>
+                      <option value="custom">Пользовательский</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">Текстуры & Фильтрация</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Качество текстур (Texture Resolution)</label>
+                      <span>Разрешение текстурных атласов (VRAM)</span>
+                    </div>
+                    <select class="setting-control" id="set-tex-quality">
+                      <option value="cinematic">Кинематографическое (8K Ultra HD)</option>
+                      <option value="ultra" selected>Ультра (4K High-Res)</option>
+                      <option value="high">Высокое (2K)</option>
+                      <option value="medium">Среднее (1080p)</option>
+                      <option value="low">Низкое</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Анизотропная фильтрация (Anisotropic Filtering / AF)</label>
+                      <span>Четкость текстур под острым углом</span>
+                    </div>
+                    <select class="setting-control" id="set-aniso-filter">
+                      <option value="16x_hq" selected>16x HQ (High-Quality Anisotropic)</option>
+                      <option value="16x">16x Анизотропная</option>
+                      <option value="8x">8x Анизотропная</option>
+                      <option value="4x">4x Анизотропная</option>
+                      <option value="2x">2x Анизотропная</option>
+                      <option value="trilinear">Трилинейная (Trilinear)</option>
+                      <option value="bilinear">Билинейная (Bilinear)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Variable Rate Shading (VRS)</label>
+                      <span>Адаптивное снижение нагрузки на шейдеры</span>
+                    </div>
+                    <select class="setting-control" id="set-vrs">
+                      <option value="off">Выключено (Полное качество)</option>
+                      <option value="tier1">VRS Tier 1 (Адаптивное)</option>
+                      <option value="tier2" selected>VRS Tier 2 (С учетом контраста)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Качество мешей и геометрии (Nanite / LOD)</label>
+                      <span>Плотность полигональной геометрии</span>
+                    </div>
+                    <select class="setting-control" id="set-mesh-quality">
+                      <option value="cinematic" selected>Кинематографическая (Nanite Sub-pixel)</option>
+                      <option value="ultra">Ультра</option>
+                      <option value="high">Высокая</option>
+                      <option value="medium">Средняя</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Смещение детализации (LOD Bias)</label>
+                      <span>Дистанция переключения LOD моделей</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="set-lod-bias" min="50" max="200" step="10" value="120">
+                      <span class="range-val" id="val-set-lod-bias">120%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">Трассировка лучей & Path Tracing (RTX / DXR)</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Освещение & Трассировка</label>
+                      <span>Технология рендеринга света</span>
+                    </div>
+                    <select class="setting-control" id="set-raytracing-mode">
+                      <option value="path_tracing">Трассировка путей (Path Tracing)</option>
+                      <option value="ray_tracing">Трассировка лучей (Ray Tracing)</option>
+                      <option value="off" selected>Выключено (Растеризация)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Глобальное освещение (RTX GI / Lumen)</label>
+                      <span>Непрямой свет и диффузные переотражения</span>
+                    </div>
+                    <select class="setting-control" id="set-rt-gi">
+                      <option value="infinite_bounce" selected>Бесконечные переотражения (ReSTIR GI)</option>
+                      <option value="multi_bounce">Двойной отскок (Multi-bounce)</option>
+                      <option value="single_bounce">Одиночный отскок</option>
+                      <option value="ssgi">SSGI (Экранное пространство)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Отражения трассировкой лучей (RT Reflections)</label>
+                      <span>Зеркальные и шероховатые PBR отражения</span>
+                    </div>
+                    <select class="setting-control" id="set-rt-reflections">
+                      <option value="full_roughness" selected>Полные PBR отражения всех поверхностей</option>
+                      <option value="glossy_only">Только зеркальные поверхности</option>
+                      <option value="ssr_hybrid">Гибридные SSR + RT</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Тени трассировкой лучей (RT Shadows)</label>
+                      <span>Контактные мягкие тени от солнца и источников</span>
+                    </div>
+                    <select class="setting-control" id="set-rt-shadows">
+                      <option value="sun_and_local" selected>Солнце + Все точечные источники</option>
+                      <option value="sun_only">Только солнечные тени</option>
+                      <option value="csm">Каскадные карты теней (CSM)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Количество отскоков лучей (Ray Bounces)</label>
+                      <span>Глубина трассировки путей света</span>
+                    </div>
+                    <select class="setting-control" id="set-rt-bounces">
+                      <option value="4">4 отскока (Cinematic Maximum)</option>
+                      <option value="3" selected>3 отскока (Ultra)</option>
+                      <option value="2">2 отскока (High)</option>
+                      <option value="1">1 отскок</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Шумоподавление лучей (Ray Denoiser)</label>
+                      <span>Алгоритм фильтрации шума трассировки</span>
+                    </div>
+                    <select class="setting-control" id="set-rt-denoiser">
+                      <option value="nrd_reblur" selected>NVIDIA NRD Reblur (AI Adaptive)</option>
+                      <option value="asvgf">ASVGF Spatio-Temporal</option>
+                      <option value="svgf">SVGF Spatial Filter</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">Освещение, Тени & Атмосфера</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Качество теней (Shadow Map Quality)</label>
+                      <span>Разрешение карт теней</span>
+                    </div>
+                    <select class="setting-control" id="set-shadow-quality">
+                      <option value="4096" selected>4096 × 4096 (Cinematic Ultra)</option>
+                      <option value="2048">2048 × 2048 (Высокое)</option>
+                      <option value="1024">1024 × 1024 (Среднее)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Объемный туман & Лучи света (Volumetric Fog / Godrays)</label>
+                      <span>3D Voxelized Fog с объемным рассеянием</span>
+                    </div>
+                    <select class="setting-control" id="set-volumetrics">
+                      <option value="ultra" selected>Ультра (128×128×256 Froxel Grid)</option>
+                      <option value="high">Высокое (64×64×128 Grid)</option>
+                      <option value="medium">Среднее</option>
+                      <option value="off">Выключено</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Объемные облака (Volumetric Clouds)</label>
+                      <span>Многослойная процедурная атмосфера</span>
+                    </div>
+                    <select class="setting-control" id="set-clouds">
+                      <option value="cinematic" selected>Кинематографические 3D облака</option>
+                      <option value="high">Высокое качество</option>
+                      <option value="medium">Среднее</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Симуляция воды & Океана (FFT Water Physics)</label>
+                      <span>Гидродинамические волны и подводная каустика</span>
+                    </div>
+                    <select class="setting-control" id="set-water-sim">
+                      <option value="ultra" selected>Ультра (FFT 512 + Каустика + RT)</option>
+                      <option value="high">Высокое (FFT 256)</option>
+                      <option value="medium">Среднее</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Подкожное рассеяние (Subsurface Scattering / SSS)</label>
+                      <span>Рассеяние света в коже персонажей и воске</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-sss" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Плотность растительности & Травы (Foliage Density)</label>
+                      <span>Инстансинг травы с физикой ветра</span>
+                    </div>
+                    <select class="setting-control" id="set-foliage">
+                      <option value="cinematic" selected>Кинематографическая (100% Плотность + XPBD)</option>
+                      <option value="high">Высокая (75%)</option>
+                      <option value="medium">Средняя (50%)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">Постобработка & Камера</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Отражения экранного пространства (SSR)</label>
+                      <span>Экранная трассировка лучей</span>
+                    </div>
+                    <select class="setting-control" id="set-ssr">
+                      <option value="hiz_tracing" selected>Hi-Z Depth Buffer Tracing (Ультра)</option>
+                      <option value="linear_steps">Linear Ray Marching</option>
+                      <option value="off">Выключено</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Размытие в движении (Motion Blur)</label>
+                      <span>Кинематографическое размытие на основе Velocity Buffer</span>
+                    </div>
+                    <select class="setting-control" id="set-motion-blur">
+                      <option value="camera_and_objects" selected>Камера + Все объекты (Высокое)</option>
+                      <option value="camera_only">Только вращение камеры</option>
+                      <option value="off">Выключено</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Глубина резкости (Depth of Field / Bokeh DOF)</label>
+                      <span>Физическая симуляция линзы и боке</span>
+                    </div>
+                    <select class="setting-control" id="set-dof-mode">
+                      <option value="cinematic_bokeh" selected>Кинематографическое Bokeh (Диафрагма f/1.8)</option>
+                      <option value="gaussian">Gaussian Blur DOF</option>
+                      <option value="off">Выключено</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Зернистость пленки (Film Grain)</label>
+                      <span>Эффект кинокамеры</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="set-film-grain" min="0" max="100" value="15">
+                      <span class="range-val" id="val-set-film-grain">15%</span>
+                    </div>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Хроматическая аберрация (Chromatic Aberration)</label>
+                      <span>Дисперсия цвета по краям линзы</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-chromatic-aberration" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Свечение (HDR Bloom)</label>
+                      <span>Физически корректное рассеивание яркого света</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-bloom" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. AUDIO -->
+              <div class="settings-subpanel" id="subpanel-audio">
+                <h3>Настройки звука и аудиосистемы</h3>
+
+                <div class="settings-group-header">Устройства вывода</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Устройство воспроизведения</label>
+                      <span>Основной аудиовыход</span>
+                    </div>
+                    <select class="setting-control" id="set-audio-device">
+                      <option value="default" selected>По умолчанию (Системное устройство)</option>
+                      <option value="dualsense">Sony DualSense Wireless Controller Audio</option>
+                      <option value="headphones">Наушники / Гарнитура</option>
+                      <option value="speakers">Акустическая система 5.1 / 7.1</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Устройство записи (Микрофон)</label>
+                      <span>Голосовой чат</span>
+                    </div>
+                    <select class="setting-control" id="set-mic-device">
+                      <option value="default" selected>По умолчанию (Системный микрофон)</option>
+                      <option value="dualsense_mic">Sony DualSense Встроенный микрофон</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Пространственный 3D-звук (Dolby Atmos / Windows Sonic)</label>
+                      <span>Позиционирование источников в трехмерном пространстве</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-spatial-audio" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Проверка звука</label>
+                      <span>Воспроизведение тестового гармонического сигнала</span>
+                    </div>
+                    <button class="settings-btn secondary" id="btn-test-sound" style="padding: 8px 16px;">
+                      <span>🔊 Тест звука</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">Громкость каналов</div>
+                <div class="setting-group">
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Общая громкость (Master Volume)</label>
+                      <span>Глобальный уровень микширования</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="vol-master" min="0" max="100" value="85">
+                      <span class="range-val" id="val-vol-master">85%</span>
+                    </div>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Музыка (Music)</label>
+                      <span>Фоновые композиции и саундтрек</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="vol-music" min="0" max="100" value="70">
+                      <span class="range-val" id="val-vol-music">70%</span>
+                    </div>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Звуковые эффекты (SFX)</label>
+                      <span>Магия, удары, оружие, шаги и окружение</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="vol-sfx" min="0" max="100" value="90">
+                      <span class="range-val" id="val-vol-sfx">90%</span>
+                    </div>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Диалоги и голос (Voice / Dialogue)</label>
+                      <span>Речь персонажей и катсцены</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="vol-voice" min="0" max="100" value="95">
+                      <span class="range-val" id="val-vol-voice">95%</span>
+                    </div>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Атмосфера и природа (Ambience)</label>
+                      <span>Ветер, дождь, шум листвы и птицы</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="vol-ambience" min="0" max="100" value="80">
+                      <span class="range-val" id="val-vol-ambience">80%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4. GAMEPLAY & CONTROLS -->
+              <div class="settings-subpanel" id="subpanel-gameplay">
+                <h3>Геймплей & Управление</h3>
+
+                <div class="settings-group-header">Игровой процесс</div>
+                <div class="setting-group">
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Сложность игры</label>
+                      <span>Баланс урона и выживания</span>
+                    </div>
+                    <select class="setting-control" id="set-difficulty">
+                      <option value="story">Сюжетный (Легкий)</option>
+                      <option value="normal" selected>Приключение (Нормальный)</option>
+                      <option value="hard">Героический (Высокий)</option>
+                      <option value="nightmare">Кошмар (Максимальный)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item slider-row">
+                    <div class="setting-info">
+                      <label>Чувствительность мыши / камеры</label>
+                      <span>Скорость поворота взгляда</span>
+                    </div>
+                    <div class="range-wrapper">
+                      <input type="range" id="set-mouse-sens" min="1" max="10" step="0.5" value="3.5">
+                      <span class="range-val" id="val-mouse-sens">3.5</span>
+                    </div>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Инверсия по оси Y</label>
+                      <span>Инвертировать вертикальное вращение</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-invert-y">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Автоматический сбор добычи (Auto-loot)</label>
+                      <span>Подбирать предметы рядом с игроком</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-autoloot" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Субтитры диалогов</label>
+                      <span>Отображение текста речи</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-subtitles" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="setting-item">
+                    <div class="setting-info">
+                      <label>Отображение FPS и сетевого оверлея</label>
+                      <span>Счетчик кадров и пинг в углу экрана</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-fps-counter" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="settings-group-header" style="margin-top: 14px;">Привязка клавиш</div>
+                <div class="keybinds-table">
+                  <div class="keybind-row">
+                    <span>Открыть / Закрыть Tab-меню</span>
+                    <kbd class="kbd-badge">TAB</kbd>
+                  </div>
+                  <div class="keybind-row">
+                    <span>Открыть Инвентарь напрямую</span>
+                    <kbd class="kbd-badge">I</kbd>
+                  </div>
+                  <div class="keybind-row">
+                    <span>Открыть Карту мира</span>
+                    <kbd class="kbd-badge">M</kbd>
+                  </div>
+                  <div class="keybind-row">
+                    <span>Окно характеристик героя</span>
+                    <kbd class="kbd-badge">C</kbd>
+                  </div>
+                  <div class="keybind-row">
+                    <span>Настройки</span>
+                    <kbd class="kbd-badge">O</kbd>
+                  </div>
+                  <div class="keybind-row">
+                    <span>Свободная камера</span>
+                    <kbd class="kbd-badge">F3</kbd>
+                  </div>
+                </div>
+
+                <!-- Settings Save / Reset Actions -->
+                <div class="settings-footer-actions" style="margin-top: 20px;">
+                  <button class="settings-btn secondary" id="btn-reset-settings">Сбросить по умолчанию</button>
+                  <button class="settings-btn primary" id="btn-save-settings">Сохранить изменения</button>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="tab_menu.js"></script>
+</body>
+</html>

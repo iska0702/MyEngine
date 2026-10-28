@@ -1,0 +1,44 @@
+# MyEngine Prefab Archetype Definition
+[PREFAB]
+name = StreetLamp
+guid = c1a01b22-4e89-4f77-9a01-9a7b53cf1101
+version = 1
+
+[NODE]
+name = StreetLamp_Root
+tag = Prop_Light
+pos = 0 0 0
+rot = 0 0 0
+scale = 1 1 1
+  [NODE]
+  name = Lamp_Pole
+  tag = Prop
+  pos = 0 1.75 0
+  rot = 0 0 0
+  scale = 0.15 3.5 0.15
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 0.2 0.2 0.22 1
+  roughness = 0.6
+  metallic = 0.85
+  [END_NODE]
+  [NODE]
+  name = Lantern_Head
+  tag = Prop_Light
+  pos = 0 3.65 0
+  rot = 0 0 0
+  scale = 0.45 0.4 0.45
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 1 0.95 0.8 1
+  roughness = 0.2
+  emissive = 1 0.85 0.5
+  emissive_intensity = 4
+  has_light = 1
+  light_type = Point
+  light_color = 1 0.82 0.5
+  light_intensity = 5
+  light_radius = 14
+  light_offset = 0 0 0
+  [END_NODE]
+[END_NODE]

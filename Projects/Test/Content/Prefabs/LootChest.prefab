@@ -1,0 +1,45 @@
+# MyEngine Prefab Archetype Definition
+[PREFAB]
+name = LootChest
+guid = c3c03d44-6a01-4f99-9c03-7c9d75eb3303
+version = 1
+
+[NODE]
+name = LootChest_Root
+tag = Interactive_Chest
+pos = 0 0 0
+rot = 0 0 0
+scale = 1 1 1
+  [NODE]
+  name = Chest_Body
+  tag = Prop
+  pos = 0 0.35 0
+  rot = 0 0 0
+  scale = 0.8 0.7 0.55
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 0.5 0.28 0.12 1
+  roughness = 0.65
+  metallic = 0.15
+  [END_NODE]
+  [NODE]
+  name = Chest_Lock
+  tag = Prop_Light
+  pos = 0 0.45 0.3
+  rot = 0 0 0
+  scale = 0.15 0.2 0.08
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 1 0.85 0.2 1
+  roughness = 0.2
+  metallic = 0.95
+  emissive = 1 0.9 0.3
+  emissive_intensity = 2
+  has_light = 1
+  light_type = Point
+  light_color = 1 0.85 0.25
+  light_intensity = 2
+  light_radius = 5
+  light_offset = 0 0 0
+  [END_NODE]
+[END_NODE]

@@ -1,0 +1,44 @@
+# MyEngine Prefab Archetype Definition
+[PREFAB]
+name = BeaconTower
+guid = c4d04e55-7b12-4a00-ad04-8dae86fc4404
+version = 1
+
+[NODE]
+name = BeaconTower_Root
+tag = Prop_Tower
+pos = 0 0 0
+rot = 0 0 0
+scale = 1 1 1
+  [NODE]
+  name = Tower_Base
+  tag = Structure
+  pos = 0 3.0 0
+  rot = 0 0 0
+  scale = 1.0 6.0 1.0
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 0.4 0.42 0.45 1
+  roughness = 0.8
+  metallic = 0.3
+  [END_NODE]
+  [NODE]
+  name = Tower_Beacon
+  tag = Prop_Light
+  pos = 0 6.3 0
+  rot = 0 0 0
+  scale = 0.6 0.6 0.6
+  has_mesh = 1
+  mesh_type = Cube
+  diffuse = 0.2 0.9 1.0 1
+  emissive = 0.2 0.85 1.0
+  emissive_intensity = 6
+  has_light = 1
+  light_type = Spot
+  light_color = 0.3 0.8 1.0
+  light_intensity = 8.0
+  light_radius = 25.0
+  spot_angle = 35.0
+  light_offset = 0 0 0
+  [END_NODE]
+[END_NODE]

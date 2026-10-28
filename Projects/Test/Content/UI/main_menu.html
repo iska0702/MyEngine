@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Главное меню — Idontknow</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme main-menu-body">
+  <!-- Dynamic Background Canvas (Particles, Atmosphere) -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- MAIN MENU CONTAINER -->
+  <main class="menu-screen-wrapper">
+    <div class="menu-container">
+      
+      <!-- Game Logo / Header -->
+      <header class="game-header">
+        <h1 class="game-title">Idontknow</h1>
+      </header>
+
+      <!-- Main Navigation Buttons -->
+      <nav class="main-nav">
+        <button class="menu-btn primary" id="btn-continue">
+          <span class="btn-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 4 18 12 6 20 6 4"/></svg>
+          </span>
+          <span class="btn-text">Продолжить</span>
+        </button>
+
+        <button class="menu-btn" id="btn-new-game">
+          <span class="btn-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </span>
+          <span class="btn-text">Новая игра</span>
+        </button>
+
+        <button class="menu-btn" id="btn-multiplayer">
+          <span class="btn-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </span>
+          <span class="btn-text">Мультиплеер</span>
+        </button>
+
+        <button class="menu-btn" id="btn-saves">
+          <span class="btn-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </span>
+          <span class="btn-text">Сохранения</span>
+        </button>
+
+        <button class="menu-btn" id="btn-settings-menu">
+          <span class="btn-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="btn-text">Настройки</span>
+        </button>
+
+        <button class="menu-btn" id="btn-credits">
+          <span class="btn-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </span>
+          <span class="btn-text">Авторы</span>
+        </button>
+
+        <button class="menu-btn danger" id="btn-exit">
+          <span class="btn-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </span>
+          <span class="btn-text">Выход</span>
+        </button>
+      </nav>
+
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: SETTINGS, SAVES, CREDITS, MULTIPLAYER                   -->
+  <!-- ============================================================== -->
+  <div id="menu-modal" class="modal-overlay hidden">
+    <div class="modal-card modal-large" id="modal-card-container">
+      <div class="modal-header">
+        <h3 id="modal-title">Настройки</h3>
+        <button class="modal-close-btn" id="btn-modal-close" title="Закрыть">✕</button>
+      </div>
+      <div class="modal-body" id="modal-content-body">
+        <!-- Content inserted dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="main_menu.js"></script>
+</body>
+</html>
