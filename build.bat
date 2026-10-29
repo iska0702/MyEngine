@@ -1,6 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 set VSCMD_SKIP_SENDTELEMETRY=1
+cd /D "%~dp0"
 if /I "%~1"=="release" if not "%IDK_INTERNAL_PROJECT_BUILD%"=="1" (
     set "IDK_BUILD_PROJECT=%~3"
     if not defined IDK_BUILD_PROJECT set "IDK_BUILD_PROJECT=%~dp0Projects\Test\Test.idkp"
@@ -12,34 +13,28 @@ if /I "%~1"=="release" if not "%IDK_INTERNAL_PROJECT_BUILD%"=="1" (
     exit /b !errorlevel!
 )
 
-:: Check if vcvarsall.bat exists
-set VCVARS="D:\Programs\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat"
-if not exist %VCVARS% (
-    echo ERROR: vcvarsall.bat not found at %VCVARS%
+:: Locate Visual Studio and Windows SDK on local machines or GitHub-hosted runners.
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" (
+    echo ERROR: vswhere.exe not found: "%VSWHERE%"
     exit /b 1
 )
-
-call %VCVARS% x64
-if %errorlevel% neq 0 exit /b !errorlevel!
-
-:: Some VS installations do not discover a Windows SDK on a custom drive.
-:: Keep the configured SDK when present, otherwise locate a complete local SDK.
-if "%WindowsSDKVersion%"=="\" (
-    set "LOCAL_SDK_ROOT=D:\Windows Kits\10"
-    set "LOCAL_SDK_VERSION="
-    for /f "delims=" %%V in ('dir /b /ad /o-n "D:\Windows Kits\10\Include\10.*" 2^>nul') do (
-        if not defined LOCAL_SDK_VERSION if exist "!LOCAL_SDK_ROOT!\Include\%%V\um\Windows.h" if exist "!LOCAL_SDK_ROOT!\Include\%%V\ucrt\crtdbg.h" if exist "!LOCAL_SDK_ROOT!\Lib\%%V\um\x64\kernel32.lib" if exist "!LOCAL_SDK_ROOT!\Lib\%%V\ucrt\x64\ucrt.lib" set "LOCAL_SDK_VERSION=%%V"
-    )
-    if not defined LOCAL_SDK_VERSION (
-        echo ERROR: No complete Windows SDK found. Configure the Windows SDK in Visual Studio.
-        exit /b 1
-    )
-    set "WindowsSdkDir=!LOCAL_SDK_ROOT!\"
-    set "WindowsSDKVersion=!LOCAL_SDK_VERSION!\"
-    set "INCLUDE=!INCLUDE!;!LOCAL_SDK_ROOT!\Include\!LOCAL_SDK_VERSION!\ucrt;!LOCAL_SDK_ROOT!\Include\!LOCAL_SDK_VERSION!\shared;!LOCAL_SDK_ROOT!\Include\!LOCAL_SDK_VERSION!\um;!LOCAL_SDK_ROOT!\Include\!LOCAL_SDK_VERSION!\winrt"
-    set "LIB=!LIB!;!LOCAL_SDK_ROOT!\Lib\!LOCAL_SDK_VERSION!\ucrt\x64;!LOCAL_SDK_ROOT!\Lib\!LOCAL_SDK_VERSION!\um\x64"
-    set "PATH=!LOCAL_SDK_ROOT!\bin\!LOCAL_SDK_VERSION!\x64;!PATH!"
-    echo Using local Windows SDK !LOCAL_SDK_VERSION!
+set "VSINSTALL="
+for /f "usebackq delims=" %%V in (`"%VSWHERE%" -latest -products "*" -property installationPath`) do set "VSINSTALL=%%V"
+if not defined VSINSTALL (
+    echo ERROR: Visual Studio installation not found.
+    exit /b 1
+)
+set "VCVARS=%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat"
+if not exist "%VCVARS%" (
+    echo ERROR: C++ build tools missing: "%VCVARS%"
+    exit /b 1
+)
+call "%VCVARS%" x64
+if errorlevel 1 exit /b !errorlevel!
+if not defined WindowsSDKVersion (
+    echo ERROR: Windows SDK was not configured by Visual Studio.
+    exit /b 1
 )
 
 :: -----------------------------------------------------------------------------
@@ -202,12 +197,12 @@ if not exist "%~dp0ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysX.li
 echo.
 echo ========================================================================
 echo  Building Client: %TARGET_NAME%
-echo  Output Directory: d:\MyEngine\%TARGET_DIR%\
+echo  Output Directory: %~dp0\%TARGET_DIR%\
 echo ========================================================================
 echo.
 
-if not exist d:\MyEngine\%TARGET_DIR% mkdir d:\MyEngine\%TARGET_DIR%
-cd /D d:\MyEngine\%TARGET_DIR%
+if not exist %~dp0\%TARGET_DIR% mkdir %~dp0\%TARGET_DIR%
+cd /D %~dp0\%TARGET_DIR%
 del log.txt build_log.txt > nul 2>&1
 
 :: Create folder structure
@@ -237,49 +232,49 @@ if exist Contents\world.pak del /Q Contents\world.pak > nul 2>&1
 if exist license.lic del /Q license.lic > nul 2>&1
 
 :: Pre-compile shaders with DXC into Contents\shaders
-set DXC_EXE="D:\Windows Kits\10\bin\10.0.26100.0\x64\dxc.exe"
-if exist %DXC_EXE% (
+set "DXC_EXE=%WindowsSdkDir%bin\%WindowsSDKVersion%x64\dxc.exe"
+if exist "%DXC_EXE%" (
     echo Compiling shaders...
-    %DXC_EXE% -T as_6_5 -E ASMain -Fo Contents\shaders\shaders_ASMain.cso ..\shaders\shaders.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E RasterVS -Fo Contents\shaders\raster_fallback_RasterVS.cso ..\shaders\raster_fallback.hlsl > nul
+    "%DXC_EXE%" -T as_6_5 -E ASMain -Fo Contents\shaders\shaders_ASMain.cso ..\shaders\shaders.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E RasterVS -Fo Contents\shaders\raster_fallback_RasterVS.cso ..\shaders\raster_fallback.hlsl > nul
     if errorlevel 1 exit /b 1
-    %DXC_EXE% -T vs_6_5 -E TessVS -Fo Contents\shaders\tessellation_TessVS.cso ..\shaders\tessellation.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E TessVS -Fo Contents\shaders\tessellation_TessVS.cso ..\shaders\tessellation.hlsl > nul
     if errorlevel 1 exit /b 1
-    %DXC_EXE% -T hs_6_5 -E TessHS -Fo Contents\shaders\tessellation_TessHS.cso ..\shaders\tessellation.hlsl > nul
+    "%DXC_EXE%" -T hs_6_5 -E TessHS -Fo Contents\shaders\tessellation_TessHS.cso ..\shaders\tessellation.hlsl > nul
     if errorlevel 1 exit /b 1
-    %DXC_EXE% -T ds_6_5 -E TessDS -Fo Contents\shaders\tessellation_TessDS.cso ..\shaders\tessellation.hlsl > nul
+    "%DXC_EXE%" -T ds_6_5 -E TessDS -Fo Contents\shaders\tessellation_TessDS.cso ..\shaders\tessellation.hlsl > nul
     if errorlevel 1 exit /b 1
-    %DXC_EXE% -T ms_6_5 -E MSMain -Fo Contents\shaders\shaders_MSMain.cso ..\shaders\shaders.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\shaders_PSMain.cso ..\shaders\shaders.hlsl > nul
-    %DXC_EXE% -T cs_6_5 -E CSMain -Fo Contents\shaders\hiz_CSMain.cso ..\shaders\hiz.hlsl > nul
-    %DXC_EXE% -T cs_6_5 -E CSMain -Fo Contents\shaders\vsm_management_CSMain.cso ..\shaders\vsm_management.hlsl > nul
-    %DXC_EXE% -T cs_6_5 -E CSMain -Fo Contents\shaders\astra_radiosity_CSMain.cso ..\shaders\astra_radiosity.hlsl > nul
-    %DXC_EXE% -T cs_6_5 -E CSMain -Fo Contents\shaders\taa_CSMain.cso ..\shaders\taa.hlsl > nul
-    %DXC_EXE% -T cs_6_5 -E InjectLightCS -Fo Contents\shaders\volumetric_fog_InjectLightCS.cso ..\shaders\volumetric_fog.hlsl > nul
-    %DXC_EXE% -T cs_6_5 -E AccumulateFogCS -Fo Contents\shaders\volumetric_fog_AccumulateFogCS.cso ..\shaders\volumetric_fog.hlsl > nul
-    %DXC_EXE% -T cs_6_5 -E CSMain -Fo Contents\shaders\ssr_CSMain.cso ..\shaders\ssr.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\rvt_VSMain.cso ..\shaders\rvt.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\rvt_PSMain.cso ..\shaders\rvt.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\rvt_decal_VSMain.cso ..\shaders\rvt_decal.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\rvt_decal_PSMain.cso ..\shaders\rvt_decal.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\skybox_VSMain.cso ..\shaders\skybox.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\skybox_PSMain.cso ..\shaders\skybox.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\postprocess_VSMain.cso ..\shaders\postprocess.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\postprocess_PSMain.cso ..\shaders\postprocess.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\mboit_gather_VSMain.cso ..\shaders\mboit_gather.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\mboit_gather_PSMain.cso ..\shaders\mboit_gather.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\mboit_resolve_VSMain.cso ..\shaders\mboit_resolve.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\mboit_resolve_PSMain.cso ..\shaders\mboit_resolve.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\composite_VSMain.cso ..\shaders\composite.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\composite_PSMain.cso ..\shaders\composite.hlsl > nul
-    %DXC_EXE% -T vs_6_0 -E VSMain -Fo Contents\shaders\ssao_VSMain.cso ..\shaders\ssao.hlsl > nul
-    %DXC_EXE% -T ps_6_0 -E PSMain -Fo Contents\shaders\ssao_PSMain.cso ..\shaders\ssao.hlsl > nul
-    %DXC_EXE% -T cs_6_0 -E CSMain -Fo Contents\shaders\ssgi_CSMain.cso ..\shaders\ssgi.hlsl > nul
-    %DXC_EXE% -T vs_6_0 -E VSMain -Fo Contents\shaders\ssao_blur_VSMain.cso ..\shaders\ssao_blur.hlsl > nul
-    %DXC_EXE% -T ps_6_0 -E PSMain -Fo Contents\shaders\ssao_blur_PSMain.cso ..\shaders\ssao_blur.hlsl > nul
-    %DXC_EXE% -T vs_6_5 -E VSMain -Fo Contents\shaders\fsr_upscale_VSMain.cso ..\shaders\fsr_upscale.hlsl > nul
-    %DXC_EXE% -T ps_6_5 -E PSMain -Fo Contents\shaders\fsr_upscale_PSMain.cso ..\shaders\fsr_upscale.hlsl > nul
-    %DXC_EXE% -T lib_6_3 -Fo Contents\shaders\raytracing_.cso ..\shaders\raytracing.hlsl > nul
+    "%DXC_EXE%" -T ms_6_5 -E MSMain -Fo Contents\shaders\shaders_MSMain.cso ..\shaders\shaders.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\shaders_PSMain.cso ..\shaders\shaders.hlsl > nul
+    "%DXC_EXE%" -T cs_6_5 -E CSMain -Fo Contents\shaders\hiz_CSMain.cso ..\shaders\hiz.hlsl > nul
+    "%DXC_EXE%" -T cs_6_5 -E CSMain -Fo Contents\shaders\vsm_management_CSMain.cso ..\shaders\vsm_management.hlsl > nul
+    "%DXC_EXE%" -T cs_6_5 -E CSMain -Fo Contents\shaders\astra_radiosity_CSMain.cso ..\shaders\astra_radiosity.hlsl > nul
+    "%DXC_EXE%" -T cs_6_5 -E CSMain -Fo Contents\shaders\taa_CSMain.cso ..\shaders\taa.hlsl > nul
+    "%DXC_EXE%" -T cs_6_5 -E InjectLightCS -Fo Contents\shaders\volumetric_fog_InjectLightCS.cso ..\shaders\volumetric_fog.hlsl > nul
+    "%DXC_EXE%" -T cs_6_5 -E AccumulateFogCS -Fo Contents\shaders\volumetric_fog_AccumulateFogCS.cso ..\shaders\volumetric_fog.hlsl > nul
+    "%DXC_EXE%" -T cs_6_5 -E CSMain -Fo Contents\shaders\ssr_CSMain.cso ..\shaders\ssr.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\rvt_VSMain.cso ..\shaders\rvt.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\rvt_PSMain.cso ..\shaders\rvt.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\rvt_decal_VSMain.cso ..\shaders\rvt_decal.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\rvt_decal_PSMain.cso ..\shaders\rvt_decal.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\skybox_VSMain.cso ..\shaders\skybox.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\skybox_PSMain.cso ..\shaders\skybox.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\postprocess_VSMain.cso ..\shaders\postprocess.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\postprocess_PSMain.cso ..\shaders\postprocess.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\mboit_gather_VSMain.cso ..\shaders\mboit_gather.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\mboit_gather_PSMain.cso ..\shaders\mboit_gather.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\mboit_resolve_VSMain.cso ..\shaders\mboit_resolve.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\mboit_resolve_PSMain.cso ..\shaders\mboit_resolve.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\composite_VSMain.cso ..\shaders\composite.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\composite_PSMain.cso ..\shaders\composite.hlsl > nul
+    "%DXC_EXE%" -T vs_6_0 -E VSMain -Fo Contents\shaders\ssao_VSMain.cso ..\shaders\ssao.hlsl > nul
+    "%DXC_EXE%" -T ps_6_0 -E PSMain -Fo Contents\shaders\ssao_PSMain.cso ..\shaders\ssao.hlsl > nul
+    "%DXC_EXE%" -T cs_6_0 -E CSMain -Fo Contents\shaders\ssgi_CSMain.cso ..\shaders\ssgi.hlsl > nul
+    "%DXC_EXE%" -T vs_6_0 -E VSMain -Fo Contents\shaders\ssao_blur_VSMain.cso ..\shaders\ssao_blur.hlsl > nul
+    "%DXC_EXE%" -T ps_6_0 -E PSMain -Fo Contents\shaders\ssao_blur_PSMain.cso ..\shaders\ssao_blur.hlsl > nul
+    "%DXC_EXE%" -T vs_6_5 -E VSMain -Fo Contents\shaders\fsr_upscale_VSMain.cso ..\shaders\fsr_upscale.hlsl > nul
+    "%DXC_EXE%" -T ps_6_5 -E PSMain -Fo Contents\shaders\fsr_upscale_PSMain.cso ..\shaders\fsr_upscale.hlsl > nul
+    "%DXC_EXE%" -T lib_6_3 -Fo Contents\shaders\raytracing_.cso ..\shaders\raytracing.hlsl > nul
     
     :: Copy HLSL files for runtime fallback
     copy /Y ..\shaders\*.hlsl Contents\shaders\ > nul
@@ -448,7 +443,7 @@ if errorlevel 1 (
 )
 echo  Build SUCCESSFUL!
 echo  Target: %TARGET_NAME%
-echo  Executable: d:\MyEngine\%TARGET_DIR%\Idontknow.exe
+echo  Executable: %~dp0\%TARGET_DIR%\Idontknow.exe
 echo ========================================================================
 exit /b 0
 
@@ -459,12 +454,12 @@ exit /b 0
 echo.
 echo ========================================================================
 echo  Building Dedicated Server: Headless Console (No DX12 / No GPU / Low Memory)
-echo  Output Directory: d:\MyEngine\ServerBuild\
+echo  Output Directory: %~dp0\ServerBuild\
 echo ========================================================================
 echo.
 
-if not exist d:\MyEngine\ServerBuild mkdir d:\MyEngine\ServerBuild
-cd /D d:\MyEngine\ServerBuild
+if not exist %~dp0\ServerBuild mkdir %~dp0\ServerBuild
+cd /D %~dp0\ServerBuild
 del log.txt build_log.txt > nul 2>&1
 
 set SERVER_SOURCES=..\src\Server\ServerMain.cpp ..\src\Server\DedicatedServer.cpp ..\src\Level\LevelSystem.cpp ..\src\Core\Timer.cpp ..\src\Networking\BitWriter.cpp ..\src\Networking\BitReader.cpp ..\src\Networking\Packet.cpp ..\src\Networking\NetworkSocket.cpp ..\src\Networking\NetworkConnection.cpp ..\src\Networking\NetworkObject.cpp ..\src\Networking\NetworkReplication.cpp ..\src\Networking\ServerAntiCheat.cpp ..\src\Networking\NetworkServer.cpp
@@ -506,8 +501,8 @@ del /Q *.lib > nul 2>&1
 echo.
 echo ========================================================================
 echo  Dedicated Server Build SUCCESSFUL!
-echo  Executable: d:\MyEngine\ServerBuild\IdontknowServer.exe
-echo  Config:     d:\MyEngine\ServerBuild\server.cfg
+echo  Executable: %~dp0\ServerBuild\IdontknowServer.exe
+echo  Config:     %~dp0\ServerBuild\server.cfg
 echo ========================================================================
 exit /b 0
 
@@ -518,12 +513,12 @@ exit /b 0
 echo.
 echo ========================================================================
 echo  Building Dedicated Server: Linux ELF64 (No DX12 / Zero GPU Dependencies)
-echo  Output Directory: d:\MyEngine\ServerBuild_Linux\
+echo  Output Directory: %~dp0\ServerBuild_Linux\
 echo ========================================================================
 echo.
 
-if not exist d:\MyEngine\ServerBuild_Linux mkdir d:\MyEngine\ServerBuild_Linux
-cd /D d:\MyEngine\ServerBuild_Linux
+if not exist %~dp0\ServerBuild_Linux mkdir %~dp0\ServerBuild_Linux
+cd /D %~dp0\ServerBuild_Linux
 del log.txt build_log.txt > nul 2>&1
 
 set SERVER_SOURCES=..\src\Server\ServerMain.cpp ..\src\Server\DedicatedServer.cpp ..\src\Level\LevelSystem.cpp ..\src\Core\Timer.cpp ..\src\Networking\BitWriter.cpp ..\src\Networking\BitReader.cpp ..\src\Networking\Packet.cpp ..\src\Networking\NetworkSocket.cpp ..\src\Networking\NetworkConnection.cpp ..\src\Networking\NetworkObject.cpp ..\src\Networking\NetworkReplication.cpp ..\src\Networking\ServerAntiCheat.cpp ..\src\Networking\NetworkServer.cpp
@@ -545,7 +540,7 @@ if not exist %ZIG_EXE% (
     where wsl >nul 2>&1
     if %errorlevel% equ 0 (
         echo [Linux Build] Compiling native Linux server via WSL...
-        cd /D d:\MyEngine
+        cd /D %~dp0
         wsl make server
         if !errorlevel! equ 0 (
             copy /Y bin\IdontknowServer ServerBuild_Linux\IdontknowServer >nul 2>&1
@@ -595,13 +590,13 @@ del /Q *.obj > nul 2>&1
 echo.
 echo ========================================================================
 echo  Dedicated Server (Linux) Build SUCCESSFUL!
-echo  Directory:  d:\MyEngine\ServerBuild_Linux\
+echo  Directory:  %~dp0\ServerBuild_Linux\
 if exist IdontknowServer (
-    echo  Binary:     d:\MyEngine\ServerBuild_Linux\IdontknowServer [Native Linux ELF64]
+    echo  Binary:     %~dp0\ServerBuild_Linux\IdontknowServer [Native Linux ELF64]
 ) else (
-    echo  Binary:     d:\MyEngine\ServerBuild_Linux\IdontknowServer.exe [Wine compatible]
+    echo  Binary:     %~dp0\ServerBuild_Linux\IdontknowServer.exe [Wine compatible]
 )
-echo  Config:     d:\MyEngine\ServerBuild_Linux\server.cfg
+echo  Config:     %~dp0\ServerBuild_Linux\server.cfg
 echo.
 echo  Ready to transfer:
 echo    Simply copy the 'ServerBuild_Linux' folder to your Linux VPS / machine!
@@ -609,7 +604,7 @@ echo    Run on Linux:
 echo      chmod +x IdontknowServer
 echo      ./IdontknowServer --port 7777
 echo ========================================================================
-cd /D d:\MyEngine
+cd /D %~dp0
 exit /b 0
 
 :: -----------------------------------------------------------------------------
@@ -619,12 +614,12 @@ exit /b 0
 echo.
 echo ========================================================================
 echo  Building macOS Client: Native Apple Silicon (Metal 3 + MetalFX)
-echo  Output Directory: d:\MyEngine\MacBuild\Idontknow.app\
+echo  Output Directory: %~dp0\MacBuild\Idontknow.app\
 echo ========================================================================
 echo.
 
-if not exist d:\MyEngine\MacBuild mkdir d:\MyEngine\MacBuild
-cd /D d:\MyEngine\MacBuild
+if not exist %~dp0\MacBuild mkdir %~dp0\MacBuild
+cd /D %~dp0\MacBuild
 del build_log.txt > nul 2>&1
 
 :: Create macOS .app Bundle structure
@@ -654,7 +649,7 @@ if not exist %ZIG_EXE% (
 
 if not exist %ZIG_EXE% (
     echo [ERROR] Zig cross-compiler not found at %ZIG_EXE%!
-    cd /D d:\MyEngine
+    cd /D %~dp0
     exit /b 1
 )
 
@@ -663,7 +658,7 @@ set SDK_PATH=..\tools\macos-sdk\MacOSX14.0.sdk
 if not exist %SDK_PATH% set SDK_PATH=tools\macos-sdk\MacOSX14.0.sdk
 if not exist %SDK_PATH% (
     echo [ERROR] Apple macOS SDK not found at %SDK_PATH%!
-    cd /D d:\MyEngine
+    cd /D %~dp0
     exit /b 1
 )
 
@@ -683,7 +678,7 @@ echo Packing engine content (MSL Shaders + Assets) into PAK archives...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Content\pack_all_content.ps1" -SourceContent "%IDK_CONTENT_SOURCE%"
 if errorlevel 1 (
     echo Content packing FAILED!
-    cd /D d:\MyEngine
+    cd /D %~dp0
     exit /b 1
 )
 
@@ -703,7 +698,7 @@ echo [1/2] Compiling ufbx FBX runtime...
 %ZIG_EXE% cc -target aarch64-macos.13.0-none -isysroot %SDK_PATH% -O2 -c ..\ThirdParty\EngineDependencies\ufbx.c -o obj\ufbx.o
 if errorlevel 1 (
     echo ERROR: Compiling ufbx.c failed!
-    cd /D d:\MyEngine
+    cd /D %~dp0
     exit /b 1
 )
 
@@ -719,13 +714,13 @@ set MACOS_SOURCES=..\src\Core\main.cpp ..\src\Core\Application.cpp ..\src\Core\W
 if errorlevel 1 (
     echo macOS Client Compilation FAILED!
     type build_log.txt
-    cd /D d:\MyEngine
+    cd /D %~dp0
     exit /b 1
 )
 
 if not exist Idontknow.app\Contents\MacOS\Idontknow (
     echo ERROR: Mach-O binary was not produced!
-    cd /D d:\MyEngine
+    cd /D %~dp0
     exit /b 1
 )
 
@@ -738,9 +733,9 @@ if exist *.obj del /Q *.obj > nul 2>&1
 echo.
 echo ========================================================================
 echo  macOS Client (Apple Silicon) Build SUCCESSFUL!
-echo  App Bundle: d:\MyEngine\MacBuild\Idontknow.app
-echo  Binary:     d:\MyEngine\MacBuild\Idontknow.app\Contents\MacOS\Idontknow [Native Mach-O ARM64]
-echo  Packages:   d:\MyEngine\MacBuild\Idontknow.app\Contents\Resources\Contents\ (10 PAK archives)
+echo  App Bundle: %~dp0\MacBuild\Idontknow.app
+echo  Binary:     %~dp0\MacBuild\Idontknow.app\Contents\MacOS\Idontknow [Native Mach-O ARM64]
+echo  Packages:   %~dp0\MacBuild\Idontknow.app\Contents\Resources\Contents\ (10 PAK archives)
 echo.
 echo  Ready to transfer:
 echo    Copy the 'Idontknow.app' bundle to your Mac!
@@ -750,7 +745,7 @@ echo    Then run:
 echo      open Idontknow.app
 echo      (or ./Idontknow.app/Contents/MacOS/Idontknow)
 echo ========================================================================
-cd /D d:\MyEngine
+cd /D %~dp0
 exit /b 0
 
 :: -----------------------------------------------------------------------------
@@ -761,16 +756,16 @@ exit /b 0
 echo.
 echo ========================================================================
 echo  Building PlayStation 4 Client: OpenOrbis PS4 Toolchain
-echo  Output Directory: d:\MyEngine\PS4Build\
+echo  Output Directory: %~dp0\PS4Build\
 echo ========================================================================
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Build\build_ps4.ps1" %*
 if errorlevel 1 (
     echo [ERROR] PlayStation 4 build failed!
-    cd /D d:\MyEngine
+    cd /D %~dp0
     exit /b 1
 )
-cd /D d:\MyEngine
+cd /D %~dp0
 exit /b 0
 
 :BUILD_DEFAULT_PROJECT_STEAM
