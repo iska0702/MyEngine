@@ -13,13 +13,14 @@ NavAgent::NavAgent(uint32_t id, const std::string& name)
 NavAgent::~NavAgent() = default;
 
 bool NavAgent::SetDestination(const XMFLOAT3& destination, NavMesh& navMesh) {
-    m_targetDestination = destination;
     std::vector<XMFLOAT3> newPath;
     if (navMesh.FindPath(m_position, destination, newPath)) {
+        m_targetDestination = destination;
         m_currentPath = std::move(newPath);
         m_waypointIndex = 0;
         return true;
     }
+    Stop();
     return false;
 }
 
@@ -50,6 +51,7 @@ XMFLOAT3 NavAgent::GetDebugColor() const {
 }
 
 void NavAgent::Update(float dt, NavMesh& navMesh, const XMFLOAT3& playerPos) {
+    if (!std::isfinite(dt) || dt <= 0.0f) return;
     UpdateStateTransitions(dt, navMesh, playerPos);
     UpdateMovement(dt);
 }
@@ -125,18 +127,16 @@ void NavAgent::UpdateMovement(float dt) {
         return;
     }
 
-    const XMFLOAT3& nextTarget = m_currentPath[m_waypointIndex];
-    float diffX = nextTarget.x - m_position.x;
-    float diffZ = nextTarget.z - m_position.z;
-    float dist = std::sqrt(diffX * diffX + diffZ * diffZ);
-
-    if (dist < m_arrivalDistance) {
+    float diffX = 0, diffZ = 0, dist = 0;
+    while (m_waypointIndex < m_currentPath.size()) {
+        const auto& target = m_currentPath[m_waypointIndex];
+        diffX = target.x - m_position.x; diffZ = target.z - m_position.z;
+        dist = std::sqrt(diffX * diffX + diffZ * diffZ);
+        if (dist >= m_arrivalDistance) break;
         m_waypointIndex++;
-        if (m_waypointIndex >= m_currentPath.size()) {
-            m_velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
-            return;
-        }
     }
+    if (m_waypointIndex >= m_currentPath.size()) { m_velocity = XMFLOAT3(0,0,0); return; }
+    const auto& nextTarget = m_currentPath[m_waypointIndex];
 
     // Steering towards current waypoint
     float dirX = diffX / (std::max)(dist, 0.0001f);
@@ -154,8 +154,9 @@ void NavAgent::UpdateMovement(float dt) {
     m_velocity.y = 0.0f;
     m_velocity.z = std::cos(m_yaw) * m_moveSpeed;
 
-    m_position.x += m_velocity.x * dt;
-    m_position.z += m_velocity.z * dt;
+    const float step = (std::min)(m_moveSpeed * dt, dist);
+    m_position.x += std::sin(m_yaw) * step;
+    m_position.z += std::cos(m_yaw) * step;
     m_position.y = nextTarget.y; // Match ground height
 }
 

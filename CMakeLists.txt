@@ -344,12 +344,12 @@ if(NOT (PS4 OR SONY_PS4 OR ORBIS))
     target_link_libraries(IdontknowServer PRIVATE Threads::Threads)
     if(WIN32)
         target_link_libraries(IdontknowServer PRIVATE ws2_32 advapi32 bcrypt)
-        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/include/msquic.h")
+        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.3-OpenSSL/build/native/include/msquic.h")
             message(FATAL_ERROR "Run tools/Dependencies/FetchMsQuic.ps1 before configuring the Windows server")
         endif()
         add_custom_command(TARGET IdontknowServer POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:IdontknowServer>/ThirdParty/Microsoft/MsQuic"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:IdontknowServer>/ThirdParty/Microsoft/MsQuic/msquic.dll")
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.3-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:IdontknowServer>/ThirdParty/Microsoft/MsQuic/msquic.dll")
         target_compile_options(IdontknowServer PRIVATE /utf-8 /EHsc)
     endif()
 endif()
@@ -364,6 +364,14 @@ if(BUILD_TESTING AND TARGET IdontknowServer)
     target_compile_definitions(NetworkRegression PRIVATE ENGINE_SERVER=1 NOMINMAX WIN32_LEAN_AND_MEAN)
     target_link_libraries(NetworkRegression PRIVATE Threads::Threads)
     if(WIN32)
+        add_executable(VehicleRoadAIRegression tests/VehicleRoadAIRegression.cpp)
+        target_include_directories(VehicleRoadAIRegression PRIVATE "${CMAKE_SOURCE_DIR}/src")
+        target_compile_options(VehicleRoadAIRegression PRIVATE /utf-8 /EHsc)
+        add_test(NAME vehicle_road_ai_regression COMMAND VehicleRoadAIRegression)
+        add_executable(NavAgentRegression tests/NavAgentRegression.cpp src/AI/NavAgent.cpp src/AI/NavMesh.cpp)
+        target_include_directories(NavAgentRegression PRIVATE "${CMAKE_SOURCE_DIR}/src")
+        target_compile_options(NavAgentRegression PRIVATE /utf-8 /EHsc)
+        add_test(NAME nav_agent_regression COMMAND NavAgentRegression)
         add_executable(ClientIntegrityRegression tests/ClientIntegrityRegression.cpp
             src/Security/SecuritySystem.cpp src/Security/MBAObfuscator.cpp
             src/Security/VirtualMachine.cpp src/Security/HardwareID.cpp
@@ -383,7 +391,7 @@ if(BUILD_TESTING AND TARGET IdontknowServer)
         add_dependencies(TlsRegression IdontknowServer)
         add_custom_command(TARGET TlsRegression POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:TlsRegression>/ThirdParty/Microsoft/MsQuic"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:TlsRegression>/ThirdParty/Microsoft/MsQuic/msquic.dll")
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.3-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:TlsRegression>/ThirdParty/Microsoft/MsQuic/msquic.dll")
         find_program(IDK_PWSH pwsh)
         if(IDK_PWSH)
             add_test(NAME tls_fixtures COMMAND ${IDK_PWSH} -NoProfile -File "${CMAKE_SOURCE_DIR}/tests/CreateTlsFixtures.ps1")

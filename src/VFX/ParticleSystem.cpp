@@ -446,6 +446,30 @@ void ParticleSystem::SpawnSmoke(const XMFLOAT3& position, float duration) {
     SpawnEmitter(smoke);
 }
 
+void ParticleSystem::SpawnWaterJet(const XMFLOAT3& position, const XMFLOAT3& direction, float speed, float spread) {
+    ParticleEmitterConfig water;
+    water.name = "Water Jet";
+    water.type = EmitterType::Point;
+    water.blendMode = BlendMode::Alpha;
+    water.position = position;
+    water.direction = direction;
+    water.spawnRate = 260.0f;
+    water.maxParticles = 800;
+    water.minLifetime = 1.0f;
+    water.maxLifetime = 1.8f;
+    water.minSpeed = (std::max)(0.1f, speed * 0.88f);
+    water.maxSpeed = (std::max)(water.minSpeed, speed);
+    water.coneAngle = (std::clamp)(spread, 0.0f, 45.0f);
+    water.startSize = 0.13f;
+    water.endSize = 0.08f;
+    water.startColor = XMFLOAT4(0.48f, 0.75f, 0.9f, 0.8f);
+    water.endColor = XMFLOAT4(0.68f, 0.85f, 0.94f, 0.1f);
+    water.gravity = XMFLOAT3(0.0f, -9.81f, 0.0f);
+    water.drag = 0.05f;
+    water.looping = true;
+    SpawnEmitter(water);
+}
+
 void ParticleSystem::SpawnSparks(const XMFLOAT3& position, const XMFLOAT3& direction, size_t count) {
     ParticleEmitterConfig sparks;
     sparks.name = "Directional Sparks";
@@ -556,6 +580,16 @@ void ParticleSystem::DrawUI(const XMFLOAT3& cameraPos, const XMFLOAT3& cameraFor
     }
     ImGui::SliderFloat("Fire intensity", &fireIntensity, 0.2f, 3.0f);
 
+    static float waterSpeed = 7.0f;
+    static float waterSpread = 3.0f;
+    ImGui::SliderFloat("Water speed", &waterSpeed, 1.0f, 20.0f, "%.1f m/s");
+    ImGui::SliderFloat("Water spread", &waterSpread, 0.0f, 30.0f, "%.1f deg");
+    if (ImGui::Button(" Water jet")) {
+        // Across the camera rather than directly away from it, so the jet is visible on creation.
+        XMFLOAT3 direction(cameraForward.z, 0.7f, -cameraForward.x);
+        SpawnWaterJet(spawnTarget, direction, waterSpeed, waterSpread);
+    }
+
     ImGui::Separator();
     if (ImGui::Button(" Clear All Emitters")) {
         ClearEmitters();
@@ -586,6 +620,9 @@ void ParticleSystem::DrawUI(const XMFLOAT3& cameraPos, const XMFLOAT3& cameraFor
             if (ImGui::Button(" Remove")) removeIdx = i;
 
             ImGui::DragFloat3("Position", &cfg.position.x, 0.1f);
+            ImGui::DragFloat3("Direction", &cfg.direction.x, 0.05f);
+            ImGui::DragFloatRange2("Speed range", &cfg.minSpeed, &cfg.maxSpeed, 0.1f, 0.0f, 50.0f);
+            ImGui::SliderFloat("Spread angle", &cfg.coneAngle, 0.0f, 90.0f, "%.1f deg");
             ImGui::SliderFloat("Spawn Rate", &cfg.spawnRate, 0.0f, 200.0f, "%.1f /s");
             ImGui::SliderFloat("Start Size", &cfg.startSize, 0.02f, 2.0f);
             ImGui::SliderFloat("End Size", &cfg.endSize, 0.02f, 4.0f);

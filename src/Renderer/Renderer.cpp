@@ -1350,6 +1350,38 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
         return false;
     }
 
+    // DirectX Dump Files are produced by the Agility runtime on supported OS builds.
+    // Retain them locally in the editor; release games opt in through the environment.
+    {
+        D3D12_FEATURE_DATA_DUMP_FILE caps{};
+        HRESULT support = m_device->CheckFeatureSupport(D3D12_FEATURE_DUMP_FILE, &caps, sizeof(caps));
+        ComPtr<ID3D12DeviceDumpFile> dump;
+        HRESULT available = m_device.As(&dump);
+        if (FAILED(support) || !caps.SupportedByOS || FAILED(available)) {
+            std::ostringstream detail;
+            detail << "DirectX Dump Files unavailable (OS support=" << caps.SupportedByOS
+                   << ", feature HRESULT=0x" << std::hex << static_cast<unsigned long>(support)
+                   << ", interface HRESULT=0x" << static_cast<unsigned long>(available) << ").";
+            m_directXDumpStatus = detail.str();
+        } else {
+#if defined(ENGINE_EDITOR)
+            bool retain = true;
+#else
+            bool retain = false;
+#endif
+            wchar_t setting[8]{};
+            if (GetEnvironmentVariableW(L"IDK_DXDMP_RETAIN", setting, _countof(setting)) > 0)
+                retain = setting[0] == L'1';
+            dump->RetainDumpFile(retain ? TRUE : FALSE);
+            std::ostringstream detail;
+            detail << "DirectX Dump Files supported; driver tier=" << static_cast<unsigned>(caps.DumpFileDriverTier)
+                   << ", options=0x" << std::hex << caps.DumpFileDriverOptionsMask
+                   << "; local retention " << (retain ? "enabled (%LOCALAPPDATA%\\CrashDumps)" : "disabled");
+            m_directXDumpStatus = detail.str();
+        }
+        EngineLog::Write(m_directXDumpStatus);
+    }
+
     m_pipelineCache.Initialize(m_device.Get());
     if (slSetD3DDevice(m_device.Get()) == sl::Result::eOk) {
         LOG("Streamline D3D Device Set");

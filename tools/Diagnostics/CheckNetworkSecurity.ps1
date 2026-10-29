@@ -6,9 +6,9 @@ $root=[IO.Path]::GetFullPath((Join-Path (Split-Path $PSScriptRoot -Parent) '..')
 $diagnostics=Join-Path $root 'Diagnostics';New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
 & (Join-Path $root 'tests/CreateTlsFixtures.ps1')
 $runtime=Join-Path $diagnostics 'ThirdParty/Microsoft/MsQuic';New-Item -ItemType Directory -Force -Path $runtime | Out-Null
-Copy-Item -LiteralPath (Join-Path $root 'ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll') -Destination $runtime -Force
+Copy-Item -LiteralPath (Join-Path $root 'ThirdParty/Microsoft/MsQuic-2.6.3-OpenSSL/build/native/bin/x64/msquic.dll') -Destination $runtime -Force
 $build=[IO.File]::ReadAllText((Join-Path $root 'build.bat'))
-$start=$build.IndexOf(':: Check if vcvarsall.bat exists');$end=$build.IndexOf(':: Determine Build Target')
+$start=$build.IndexOf(':: Locate Visual Studio and Windows SDK');$end=$build.IndexOf(':: Determine Build Target')
 if($start-lt 0 -or $end-le $start){throw 'Missing compiler bootstrap'}
 $bootstrap=$build.Substring($start,$end-$start)
 $sources=(Get-ChildItem -LiteralPath (Join-Path $root 'src/Networking') -Filter '*.cpp' | Where-Object {$_.BaseName-ne 'MultiplayerManager'} | ForEach-Object {'"'+$_.FullName+'"'}) -join ' '

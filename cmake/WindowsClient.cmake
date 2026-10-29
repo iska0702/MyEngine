@@ -1,4 +1,4 @@
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/include/msquic.h")
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.3-OpenSSL/build/native/include/msquic.h")
     message(FATAL_ERROR "Run tools/Dependencies/FetchMsQuic.ps1 before configuring the Windows client")
 endif()
 # Windows client dependencies match the supported build.bat path.
@@ -25,7 +25,7 @@ endif()
 target_compile_definitions(Idontknow PRIVATE WIN32_LEAN_AND_MEAN UNICODE _UNICODE _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
 target_compile_options(Idontknow PRIVATE /bigobj /EHsc /utf-8 /W3 /MP4)
 target_include_directories(Idontknow PRIVATE
-    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/AgilitySDK-1.619.6/build/native/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/AgilitySDK-1.620.1/build/native/include"
     "${CMAKE_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/src/Core"
@@ -38,7 +38,7 @@ target_include_directories(Idontknow PRIVATE
     "${CMAKE_SOURCE_DIR}/ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src"
     "${CMAKE_SOURCE_DIR}/src/imgui"
     "${CMAKE_SOURCE_DIR}/ThirdParty/NVIDIA/streamline-sdk-v2.14.1/include"
-    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/DirectX-Headers/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/DirectX-Headers-1.620.1/include"
     "${CMAKE_SOURCE_DIR}/ThirdParty/AMD/FidelityFX-SDK-v1.1.4/sdk/include/FidelityFX"
     "${CMAKE_SOURCE_DIR}/ThirdParty/AMD/FidelityFX-SDK-v1.1.4/sdk/include/FidelityFX/gpu"
     "${CMAKE_SOURCE_DIR}/ThirdParty/Intel/XeSS_SDK_3.0.2/inc"
@@ -47,7 +47,7 @@ target_include_directories(Idontknow PRIVATE
     "${CMAKE_SOURCE_DIR}/ThirdParty/Intel/XeSS_SDK_3.0.2/inc/xell"
     "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/DirectStorage/sdk-package/native/include"
     "${CMAKE_SOURCE_DIR}/ThirdParty/NVIDIA/PhysX/physx/include"
-    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/WebView2/build/native/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/WebView2-1.0.4314.35/build/native/include"
     "${CMAKE_SOURCE_DIR}/ThirdParty/Discord/discord_social_sdk/include"
 )
 add_custom_command(TARGET Idontknow POST_BUILD
@@ -73,7 +73,7 @@ target_link_libraries(Idontknow PRIVATE
     "ws2_32.lib"
     "shlwapi.lib"
     "iphlpapi.lib"
-    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/WebView2/build/native/x64/WebView2Loader.dll.lib"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/WebView2-1.0.4314.35/build/native/x64/WebView2Loader.dll.lib"
     "${CMAKE_SOURCE_DIR}/ThirdParty/NVIDIA/streamline-sdk-v2.14.1/lib/x64/sl.interposer.lib"
     "${CMAKE_SOURCE_DIR}/ThirdParty/Intel/XeSS_SDK_3.0.2/lib/libxess.lib"
     "${CMAKE_SOURCE_DIR}/ThirdParty/Intel/XeSS_SDK_3.0.2/lib/libxess_fg.lib"

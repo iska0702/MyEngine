@@ -4,7 +4,7 @@ $root=[IO.Path]::GetFullPath((Join-Path (Split-Path $PSScriptRoot -Parent) '..')
 $diagnostics=Join-Path $root 'Diagnostics'
 New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
 $batch=[IO.File]::ReadAllText((Join-Path $root 'build.bat'))
-$start=$batch.IndexOf(':: Check if vcvarsall.bat exists')
+$start=$batch.IndexOf(':: Locate Visual Studio and Windows SDK')
 $end=$batch.IndexOf(':: Determine Build Target')
 if($start-lt 0 -or $end-le $start){throw 'Compiler bootstrap missing from build.bat'}
 $bootstrap=$batch.Substring($start,$end-$start)

@@ -28,9 +28,6 @@ bool NavigationSystem::Initialize() {
     std::vector<Camera::CollisionBox> emptyObstacles;
     m_navMesh.Bake(m_currentParams, emptyObstacles, m_defaultFloorY);
 
-    // Spawn demo patrol squad around center
-    SpawnDemoSquad(XMFLOAT3(0.0f, 0.0f, 0.0f));
-
     return true;
 }
 
@@ -52,7 +49,8 @@ bool NavigationSystem::BakeFromScene(const std::vector<Camera::CollisionBox>& ob
     // After re-baking, restart path for all agents towards their current destinations
     for (auto& agent : m_agents) {
         if (agent) {
-            agent->SetDestination(agent->GetPosition(), m_navMesh);
+            const auto destination = agent->GetDestination();
+            agent->SetDestination(destination, m_navMesh);
         }
     }
     return success;
@@ -148,14 +146,14 @@ void NavigationSystem::SpawnDemoSquad(const XMFLOAT3& centerPos) {
 void NavigationSystem::SyncWithRenderer(Renderer* renderer) {
     if (!renderer) return;
 
-    // Synchronize agent positions and yaw headings to dynamic models if available
+    // Only explicitly assigned models may be moved by an agent.
     auto& dynModels = renderer->GetDynamicModels();
-    for (size_t i = 0; i < m_agents.size() && i < dynModels.size(); ++i) {
-        if (m_agents[i]) {
-            const auto& pos = m_agents[i]->GetPosition();
-            dynModels[i].position = pos;
-            dynModels[i].rotation.y = XMConvertToDegrees(m_agents[i]->GetYaw());
-        }
+    for (const auto& agent : m_agents) {
+        if (!agent || !agent->GetModelId()) continue;
+        auto found = std::find_if(dynModels.begin(), dynModels.end(), [&](const auto& m) { return m.modelId == agent->GetModelId(); });
+        if (found == dynModels.end() || found->physicsBodyType == 2) continue;
+        found->position = agent->GetPosition();
+        found->rotation.y = XMConvertToDegrees(agent->GetYaw());
     }
 }
 
@@ -225,6 +223,8 @@ void NavigationSystem::DrawUI(Renderer* renderer, const XMFLOAT3& playerPos,
             }
 
             // Speed slider
+            int modelId = static_cast<int>(agent->GetModelId());
+            if (ImGui::InputInt("Dynamic model ID (0 = none)", &modelId)) agent->SetModelId(static_cast<uint32_t>((std::max)(0, modelId)));
             float speed = agent->GetSpeed();
             if (ImGui::SliderFloat("Move Speed", &speed, 0.5f, 15.0f, "%.1f m/s")) {
                 agent->SetSpeed(speed);

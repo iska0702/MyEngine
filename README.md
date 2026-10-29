@@ -152,6 +152,18 @@ A DirectX 12-capable GPU is needed to run the editor's graphics features. DXR, m
 
 ## Build the Windows editor
 
+Microsoft dependencies used by the Windows client are pinned to Agility SDK 1.620.1,
+DirectX-Headers 1.620.1, DirectStorage 1.3.0, WebView2 SDK 1.0.4314.35 and
+MsQuic 2.6.3 (OpenSSL). Install Agility with `tools/Graphics/InstallAgilitySDK.ps1`,
+WebView2 and DirectX-Headers with `tools/Dependencies/FetchMicrosoftGraphicsSDKs.ps1`,
+and MsQuic with `tools/Dependencies/FetchMsQuic.ps1`. DirectStorage is installed separately.
+
+When supported by Windows and the active driver, DirectX Dump Files are retained by
+the editor in `%LOCALAPPDATA%\CrashDumps` after a GPU timeout. They can be opened in
+PIX 2610.28 or later. Release builds do not retain dumps by default; set
+`IDK_DXDMP_RETAIN=1` before starting the game to opt in. Set it to `0` to disable
+editor retention. Availability and driver detail are displayed in Graphics Settings.
+
 Clone the repository and its submodules:
 
 ```powershell

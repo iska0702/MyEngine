@@ -34,6 +34,9 @@
 # SDKs are installed locally; small source dependencies remain in Git
 /ThirdParty/*
 !/ThirdParty/Libraries/
+!/ThirdParty/OpenSource/
+/ThirdParty/OpenSource/*
+!/ThirdParty/OpenSource/OpenXR/
 /ThirdParty/Libraries/EngineDependencies/**/*.exe
 /ThirdParty/Libraries/EngineDependencies/**/*.dll
 

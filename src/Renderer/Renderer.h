@@ -675,6 +675,8 @@ public:
     std::shared_ptr<Texture> GetDefaultTexture() const { return m_defaultTexture; }
 #if defined(_WIN32)
     ID3D12Device2* GetDevice() const { return m_device.Get(); }
+    ID3D12CommandQueue* GetCommandQueue() const { return m_commandQueue.Get(); }
+    const std::string& GetDirectXDumpStatus() const { return m_directXDumpStatus; }
     const D3D12_HEAP_PROPERTIES& GetUploadHeapProps() const { return m_heapPropsUpload; }
 #elif defined(ENGINE_PLATFORM_PS4) || defined(__PS4__) || defined(__ORBIS__)
     EngineRender::PS4RendererBackend* GetPS4Backend() const { return m_ps4Backend.get(); }
@@ -1216,6 +1218,9 @@ private:
     int  m_pendingResizeHeight = 0;
     bool m_firstFrameAfterResize = true;
     bool m_deviceRemoved = false;
+#if defined(_WIN32)
+    std::string m_directXDumpStatus = "Not initialized";
+#endif
     bool m_rtSceneDirty = true;
     int  m_framesAfterResize = 0;
 

@@ -80,8 +80,10 @@ bool NavMesh::Bake(const NavMeshParams& params,
 
 bool NavMesh::WorldToGrid(const XMFLOAT3& worldPos, int& outX, int& outZ) const {
     if (!m_baked || m_width <= 0 || m_height <= 0) return false;
+    if (!std::isfinite(worldPos.x) || !std::isfinite(worldPos.z)) return false;
     float relX = worldPos.x - m_params.minBounds.x;
     float relZ = worldPos.z - m_params.minBounds.z;
+    if (relX < 0 || relZ < 0 || relX >= m_width*m_params.cellSize || relZ >= m_height*m_params.cellSize) return false;
     outX = static_cast<int>(std::floor(relX / m_params.cellSize));
     outZ = static_cast<int>(std::floor(relZ / m_params.cellSize));
     return IsValidCoord(outX, outZ);
@@ -100,10 +102,15 @@ bool NavMesh::IsWalkable(const XMFLOAT3& worldPos) const {
 }
 
 bool NavMesh::FindNearestWalkablePosition(const XMFLOAT3& worldPos, XMFLOAT3& outPos, float searchRadius) const {
+    if (!m_baked || m_width<=0 || m_height<=0 || !std::isfinite(worldPos.x) || !std::isfinite(worldPos.z) || !std::isfinite(searchRadius) || searchRadius<0) return false;
+    const XMFLOAT3 input=worldPos; // The caller may pass the same object for input and output.
     int cx, cz;
-    if (!WorldToGrid(worldPos, cx, cz)) {
-        cx = std::clamp(cx, 0, m_width - 1);
-        cz = std::clamp(cz, 0, m_height - 1);
+    if (!WorldToGrid(input, cx, cz)) {
+        const float maxX=m_params.minBounds.x+m_width*m_params.cellSize;
+        const float maxZ=m_params.minBounds.z+m_height*m_params.cellSize;
+        if(input.x<m_params.minBounds.x-searchRadius || input.x>maxX+searchRadius || input.z<m_params.minBounds.z-searchRadius || input.z>maxZ+searchRadius) return false;
+        cx = (std::clamp)(static_cast<int>(std::floor((input.x-m_params.minBounds.x)/m_params.cellSize)), 0, m_width - 1);
+        cz = (std::clamp)(static_cast<int>(std::floor((input.z-m_params.minBounds.z)/m_params.cellSize)), 0, m_height - 1);
     }
 
     int rSteps = static_cast<int>(std::ceil(searchRadius / m_params.cellSize));
@@ -117,7 +124,9 @@ bool NavMesh::FindNearestWalkablePosition(const XMFLOAT3& worldPos, XMFLOAT3& ou
             if (!IsValidCoord(nx, nz)) continue;
             size_t idx = GetNodeIndex(nx, nz);
             if (m_nodes[idx].flags & NavCell_Walkable) {
-                float distSq = static_cast<float>(dx * dx + dz * dz);
+                float xDiff=m_nodes[idx].worldX-input.x, zDiff=m_nodes[idx].worldZ-input.z;
+                float distSq = xDiff*xDiff+zDiff*zDiff;
+                if (distSq > searchRadius*searchRadius) continue;
                 if (distSq < closestDistSq) {
                     closestDistSq = distSq;
                     outPos = XMFLOAT3(m_nodes[idx].worldX, m_nodes[idx].worldY, m_nodes[idx].worldZ);

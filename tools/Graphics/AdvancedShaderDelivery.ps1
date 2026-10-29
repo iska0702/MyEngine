@@ -8,14 +8,14 @@ param(
 )
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path (Split-Path $PSScriptRoot -Parent) '..'))
-$sdk=Join-Path $root 'ThirdParty/Microsoft/AgilitySDK-1.619.6/build/native/bin/x64'
+$sdk=Join-Path $root 'ThirdParty/Microsoft/AgilitySDK-1.620.1/build/native/bin/x64'
 $compiler=Join-Path $sdk 'D3D12StateObjectCompiler.exe'
 $config=Join-Path $sdk 'd3dconfig.exe'
 function Invoke-Checked([string]$Tool,[string[]]$ToolArguments){
     & $Tool @ToolArguments
     if($LASTEXITCODE-ne 0){throw "$Tool failed ($LASTEXITCODE)"}
 }
-if(!(Test-Path -LiteralPath $compiler)){throw 'Install the pinned Agility SDK 1.619.6 in ThirdParty first.'}
+if(!(Test-Path -LiteralPath $compiler)){throw 'Install the pinned Agility SDK 1.620.1 in ThirdParty first.'}
 if($Action-eq 'Support'){Invoke-Checked $compiler @('list','--adapters');return}
 if(!$ProjectFile){$ProjectFile=Join-Path $root 'Projects/Test/Test.idkp'}
 $ProjectFile=(Resolve-Path -LiteralPath $ProjectFile).Path

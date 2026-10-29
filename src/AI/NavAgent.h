@@ -35,6 +35,9 @@ public:
 
     // Getters & Setters
     uint32_t GetId() const { return m_id; }
+    uint32_t GetModelId() const { return m_modelId; }
+    void SetModelId(uint32_t id) { m_modelId = id; }
+    const XMFLOAT3& GetDestination() const { return m_targetDestination; }
     const std::string& GetName() const { return m_name; }
     void SetName(const std::string& name) { m_name = name; }
 
@@ -64,6 +67,7 @@ private:
     void UpdateStateTransitions(float dt, NavMesh& navMesh, const XMFLOAT3& playerPos);
 
     uint32_t m_id = 0;
+    uint32_t m_modelId = 0;
     std::string m_name;
     AgentState m_state = AgentState::Patrol;
 

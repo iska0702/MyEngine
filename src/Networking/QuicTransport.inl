@@ -1,7 +1,7 @@
 // Windows MsQuic backend. Application packets use one bounded, framed QUIC stream.
 // QUIC authenticates its handshake with TLS 1.3; no 0-RTT or plaintext fallback.
 #if defined(_WIN32)
-#include "../../ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/include/msquic.h"
+#include "../../ThirdParty/Microsoft/MsQuic-2.6.3-OpenSSL/build/native/include/msquic.h"
 #include <fstream>
 #include <mutex>
 #include <atomic>

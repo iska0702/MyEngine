@@ -29,6 +29,10 @@
 #include "UI/AntiAliasingControls.h"
 #include "Window.h"
 #include "Renderer.h"
+#if defined(_WIN32) && defined(ENGINE_EDITOR)
+#include "VR/OpenXRSession.h"
+static bool s_showVRDiagnostics = false;
+#endif
 #include "Camera.h"
 #include "CameraSystem.h"
 
@@ -96,6 +100,9 @@ Application::Application(int width, int height, const std::wstring& title)
 }
 
 Application::~Application() {
+#if defined(_WIN32) && defined(ENGINE_EDITOR)
+    EngineVR::Session::Get().Stop();
+#endif
     EngineScene::SceneGraph::Get().Shutdown();
     EngineAudio::AudioSystem::Get().Shutdown();
     EngineNetwork::MultiplayerManager::Get().Shutdown();
@@ -880,6 +887,12 @@ int Application::Run() {
     unsigned benchmarkFrames = 0;
 #if defined(_WIN32)
 #if defined(ENGINE_EDITOR)
+    if (m_benchmarkFrameLimit && GetEnvironmentVariableW(L"IDK_BENCHMARK_WATER", nullptr, 0) > 0) {
+        const auto pos = m_camera->GetPosition();
+        const auto forward = m_camera->GetForwardVector();
+        XMFLOAT3 target{pos.x + forward.x * 2.0f, pos.y + forward.y * 2.0f, pos.z + forward.z * 2.0f};
+        EngineVFX::ParticleSystem::Get().SpawnWaterJet(target, XMFLOAT3(forward.z, 0.7f, -forward.x));
+    }
     if (m_benchmarkFrameLimit && GetEnvironmentVariableW(L"IDK_BENCHMARK_VFX", nullptr, 0) > 0) {
         const auto pos = m_camera->GetPosition();
         const auto forward = m_camera->GetForwardVector();
@@ -1688,6 +1701,9 @@ int Application::Run() {
 
             // Update Universal Particle / VFX System
             { EngineDebug::ScopedTimer profile(EngineDebug::Subsystem::VFX);EngineVFX::ParticleSystem::Get().Update(dt, m_camera->GetPosition(), m_camera->GetUpVector()); }
+#if defined(_WIN32) && defined(ENGINE_EDITOR)
+            EngineVR::Session::Get().Tick();
+#endif
 
             // Update Terrain & Foliage System
             { EngineDebug::ScopedTimer profile(EngineDebug::Subsystem::Terrain);EngineTerrain::TerrainSystem::Get().Update(dt, m_camera->GetPosition()); }
@@ -1840,6 +1856,9 @@ int Application::Run() {
                             ImGui::EndMenu();
                         }
                         if(ImGui::BeginMenu("Window")) {
+#if defined(_WIN32) && defined(ENGINE_EDITOR)
+                            ImGui::MenuItem("VR / OpenXR diagnostics", nullptr, &s_showVRDiagnostics);
+#endif
                             ImGui::MenuItem("Scene gizmos (editor only)",nullptr,&s_showSceneGizmos);
                             ImGui::MenuItem("Lighting",nullptr,&s_showLightsUI);
                             ImGui::MenuItem("Environment",nullptr,&s_showEnvironment);
@@ -2707,6 +2726,34 @@ int Application::Run() {
                                 auto& vehiclePhysics=EnginePhysics::PhysicsSystem::Get();
                                 ImGui::Text("%.1f km/h | %.0f RPM | gear %d | contacts %d | slip %.2f",vehiclePhysics.VehicleSpeed(model.modelId)*3.6f,vehiclePhysics.VehicleRPM(model.modelId),vehiclePhysics.VehicleGear(model.modelId),vehiclePhysics.VehicleContacts(model.modelId),vehiclePhysics.VehicleSlip(model.modelId));
 
+                                if (ImGui::TreeNode("Road AI")) {
+                                    bool aiChanged = ImGui::Checkbox("AI driving", &v.aiEnabled);
+                                    aiChanged |= ImGui::Checkbox("Loop route", &v.aiLoop);
+                                    ImGui::TextWrapped("Add waypoints along the intended lane. Stop and red signal apply to each point; obstacles are detected in front of the car.");
+                                    if (v.route.size()<256 && ImGui::Button("Add waypoint at camera")) {
+                                        auto p=m_camera->GetPosition();
+                                        EnginePhysics::RoadWaypoint waypoint; waypoint.x=p.x; waypoint.y=p.y; waypoint.z=p.z;
+                                        v.route.push_back(waypoint); aiChanged=true;
+                                    }
+                                    int remove=-1;
+                                    for (size_t index=0; index<v.route.size(); ++index) {
+                                        ImGui::PushID(static_cast<int>(index)); auto& point=v.route[index];
+                                        if (ImGui::TreeNode("Waypoint", "Waypoint %zu",index+1)) {
+                                            aiChanged |= ImGui::DragFloat3("Position", &point.x, .1f);
+                                            float kmh=point.speedLimit*3.6f;
+                                            if (ImGui::DragFloat("Speed limit (km/h)",&kmh,1.f,2.f,180.f)) {point.speedLimit=(std::clamp)(kmh/3.6f,.5f,50.f);aiChanged=true;}
+                                            aiChanged |= ImGui::Checkbox("Stop sign",&point.stop);
+                                            aiChanged |= ImGui::Checkbox("Red traffic signal",&point.redSignal);
+                                            if(ImGui::Button("Remove waypoint"))remove=static_cast<int>(index);
+                                            ImGui::TreePop();
+                                        }
+                                        ImGui::PopID();
+                                    }
+                                    if(remove>=0){v.route.erase(v.route.begin()+remove);aiChanged=true;}
+                                    if(aiChanged){vehiclePhysics.ResetVehicleRoadAI(model.modelId);sceneDirty=true;}
+                                    ImGui::TreePop();
+                                }
+
                                 if(changed){v.Sanitize();if(v.enabled){model.hasCollision=true;model.physicsBodyType=2;model.physicsShapeType=0;}EnginePhysics::PhysicsSystem::Get().ApplyModelPhysics(m_renderer.get(),model.modelId,dynamic);sceneDirty=true;}
                                 ImGui::TextWrapped("Play: V near a car to enter/exit. W/S accelerate, brake and reverse; A/D steer; Space handbrake. TAB exits driving and preserves the pose. Chassis mass is in Physics.");
                             }
@@ -3107,6 +3154,31 @@ int Application::Run() {
                     //  Particle / VFX Studio Window
                     // -------------------------------------------------------
                     EngineVFX::ParticleSystem::Get().DrawUI(m_camera->GetPosition(), m_camera->GetForwardVector());
+#if defined(_WIN32) && defined(ENGINE_EDITOR)
+                    if (s_showVRDiagnostics) {
+                        static EngineVR::ProbeResult vr;
+                        if (ImGui::Begin("VR / OpenXR diagnostics", &s_showVRDiagnostics)) {
+                            ImGui::TextWrapped("Checks the installed OpenXR runtime, headset and D3D12 adapter.");
+                            if (ImGui::Button("Check OpenXR")) vr = EngineVR::Probe(m_renderer->GetDevice());
+                            if (!vr.runtime.empty()) ImGui::Text("Runtime: %s", vr.runtime.c_str());
+                            if (!vr.headset.empty()) ImGui::Text("Headset: %s", vr.headset.c_str());
+                            if (!vr.status.empty()) ImGui::TextWrapped("%s", vr.status.c_str());
+                            auto& session = EngineVR::Session::Get();
+                            if (!session.IsStarted()) {
+                                if (ImGui::Button("Start tracking test")) session.Start(m_renderer->GetDevice(), m_renderer->GetCommandQueue());
+                            } else if (ImGui::Button("Stop tracking test")) session.Stop();
+                            if (!session.Status().empty()) ImGui::TextWrapped("%s", session.Status().c_str());
+                            if (session.TrackingValid()) {
+                                const auto& left = session.Eye(0).pose.position;
+                                const auto& right = session.Eye(1).pose.position;
+                                ImGui::Text("Left eye: %.3f %.3f %.3f", left.x, left.y, left.z);
+                                ImGui::Text("Right eye: %.3f %.3f %.3f", right.x, right.y, right.z);
+                            }
+                            ImGui::TextWrapped("VR stereo rendering and controller input are not available yet.");
+                        }
+                        ImGui::End();
+                    }
+#endif
 
                     // -------------------------------------------------------
                     //  Terrain & Foliage Studio Window
@@ -3269,6 +3341,9 @@ int Application::Run() {
                     // ========== DEDICATED GRAPHICS SETTINGS WINDOW ==========
                     ImGui::SetNextWindowSize(ImVec2(500, 560), ImGuiCond_FirstUseEver);
                     if (ImGui::Begin("Graphics Settings", &s_showGraphics)) {
+#if defined(_WIN32)
+                        ImGui::TextWrapped("%s", m_renderer->GetDirectXDumpStatus().c_str());
+#endif
                         EngineUI::DrawAntiAliasingControls(*m_renderer);
                         ImGui::Separator();
                         if (ImGui::BeginTabBar("GraphicsTabBar")) {

@@ -758,6 +758,29 @@ void PhysicsSystem::Update(float dt, Renderer* renderer, Window* window, Camera*
         return;
     }
 
+    // Apply route control after player input; the occupied vehicle always remains player-controlled.
+    auto driveAI = [&](auto& models) {
+        for (auto& model : models) {
+            if (!model.vehicle.enabled || model.vehicle.part != 0 || !model.vehicle.aiEnabled || model.modelId == m_drivenVehicle || !model.visible || !model.hasCollision || model.physicsBodyType != 2) continue;
+            auto& state = m_vehicles[model.modelId];
+            const auto pose = physx::PxTransform(XM3ToPx(model.position), EulerToPxQuat(model.rotation));
+            auto forward = pose.q.rotate(physx::PxVec3(0,0,1)); forward.y = 0;
+            if (forward.normalize() < .001f) { SetVehicleInput(model.modelId, 0, 0, 1); continue; }
+            const float yaw = std::atan2(forward.x, forward.z);
+            float nearest = std::numeric_limits<float>::infinity();
+            const auto right = physx::PxVec3(forward.z,0,-forward.x);
+            for (float offset : {-0.7f,0.f,0.7f}) {
+                auto start = pose.p + forward*((std::max)(model.scale.z*.5f,1.f)+.15f) + right*offset + physx::PxVec3(0,.3f,0);
+                RaycastHitInfo hit;
+                if (Raycast(PxToXM3(start), PxToXM3(forward), 45.f, hit) && hit.ownerModelId != model.modelId)
+                    nearest = (std::min)(nearest, hit.distance);
+            }
+            const auto control = EngineAI::DriveRoad(model.vehicle,state.road,model.position.x,model.position.z,yaw,state.speed,nearest,dt);
+            SetVehicleInput(model.modelId,control.throttle,control.steer,control.brake);
+        }
+    };
+    driveAI(renderer->GetModels()); driveAI(renderer->GetDynamicModels());
+
     m_timeAccumulator += dt;
     int subSteps = 0;
 

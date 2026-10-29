@@ -41,7 +41,7 @@ if ($Platform -ne 'STEAM') {
     }
 }
 $copies = @{
-    'ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll' = 'ThirdParty/Microsoft/MsQuic'
+    'ThirdParty/Microsoft/MsQuic-2.6.3-OpenSSL/build/native/bin/x64/msquic.dll' = 'ThirdParty/Microsoft/MsQuic'
     'ThirdParty/Valve/steamworks_sdk_165/sdk/redistributable_bin/win64/steam_api64.dll' = 'ThirdParty/Steamworks'
     'ThirdParty/EpicGames/EOS-SDK-58105819-Release-v1.19.2.1/SDK/Bin/EOSSDK-Win64-Shipping.dll' = 'ThirdParty/EpicOnlineServices'
     'ThirdParty/Steamworks/lib/x64/*.dll' = 'ThirdParty/Steamworks'
@@ -56,7 +56,7 @@ $copies = @{
     'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/bin/WinPixEventRuntime.dll' = 'ThirdParty/Microsoft/DirectX'
     'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/amd_*.dll' = 'ThirdParty/AMD'
     'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/dx*.dll' = 'ThirdParty/Microsoft/DirectX'
-    'ThirdParty/Microsoft/WebView2/build/native/x64/WebView2Loader.dll' = 'ThirdParty/Microsoft/WebView2'
+    'ThirdParty/Microsoft/WebView2-1.0.4314.35/build/native/x64/WebView2Loader.dll' = 'ThirdParty/Microsoft/WebView2'
     'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/WinPixEventRuntime.dll' = 'ThirdParty/Microsoft/DirectX'
 }
 # Remove legacy Epic naming and the inactive platform's generated runtime folder.
@@ -93,7 +93,7 @@ if (Test-Path -LiteralPath $streamlinePix) {
 }
 $vkDll = Join-Path $outputRoot 'ThirdParty/AMD/amd_fidelityfx_vk.dll'
 # The application explicitly loads the pinned Agility runtime.
-$agility=Join-Path $sourceRoot 'ThirdParty/Microsoft/AgilitySDK-1.619.6/build/native/bin/x64'
+$agility=Join-Path $sourceRoot 'ThirdParty/Microsoft/AgilitySDK-1.620.1/build/native/bin/x64'
 $agilityOutput=Join-Path $outputRoot 'ThirdParty/Microsoft/Agility'
 New-Item -ItemType Directory -Path $agilityOutput -Force | Out-Null
 foreach($name in @('D3D12Core.dll','d3d12SDKLayers.dll')) {

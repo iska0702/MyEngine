@@ -58,7 +58,7 @@ inline void SetIdentity() {
         hr=identity->SetApplicationIdentity(&desc,appId);
     }
     identityReady=SUCCEEDED(hr);
-    std::ostringstream message;message<<"ASD: Agility SDK 1.619.6; project identity "
+    std::ostringstream message;message<<"ASD: Agility SDK 1.620.1; project identity "
         <<(identityReady?"set":"unavailable")<<"; HRESULT=0x"<<std::hex<<static_cast<unsigned long>(hr)
         <<"; precompiled cache usage requires a matching PSDB registration or developer override";
     EngineLog::Write(message.str());

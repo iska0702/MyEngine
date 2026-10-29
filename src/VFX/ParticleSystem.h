@@ -38,6 +38,7 @@ public:
     void SpawnExplosion(const XMFLOAT3& position, float scale = 1.0f);
     void SpawnFire(const XMFLOAT3& position, float intensity = 1.0f);
     void SpawnSmoke(const XMFLOAT3& position, float duration = 6.0f);
+    void SpawnWaterJet(const XMFLOAT3& position, const XMFLOAT3& direction, float speed = 7.0f, float spread = 3.0f);
     void SpawnSparks(const XMFLOAT3& position, const XMFLOAT3& direction, size_t count = 40);
     void SpawnMagicEnergy(const XMFLOAT3& position, const XMFLOAT4& color = { 0.3f, 0.7f, 1.0f, 1.0f });
 
@@ -60,6 +61,7 @@ public:
     void SpawnExplosion(const XMFLOAT3&, float = 1.0f) {}
     void SpawnFire(const XMFLOAT3&, float = 1.0f) {}
     void SpawnSmoke(const XMFLOAT3&, float = 6.0f) {}
+    void SpawnWaterJet(const XMFLOAT3&, const XMFLOAT3&, float = 7.0f, float = 3.0f) {}
     void SpawnSparks(const XMFLOAT3&, const XMFLOAT3&, size_t = 40) {}
     void SpawnMagicEnergy(const XMFLOAT3&, const XMFLOAT4& = { 0.3f, 0.7f, 1.0f, 1.0f }) {}
 

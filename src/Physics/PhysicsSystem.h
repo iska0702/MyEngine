@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include "ColliderData.h"
+#include "AI/VehicleRoadAI.h"
 
 namespace physx {
     class PxFoundation;
@@ -131,6 +132,7 @@ public:
     float VehicleSpeed(uint32_t id) const {auto i=m_vehicles.find(id);return i==m_vehicles.end()?0:i->second.speed;}
     bool IsDriving() const { return m_drivenVehicle!=0; }
     void SetVehicleInput(uint32_t id,float throttle,float steer,float brake,bool handbrake=false);
+    void ResetVehicleRoadAI(uint32_t id) { auto i=m_vehicles.find(id); if(i!=m_vehicles.end()) i->second.road={}; }
     void StepVehicles(float dt,Renderer* renderer);
     void SimulateStep(float dt,Renderer* renderer);
     void UpdateVehicleVisuals(Renderer* renderer);
@@ -222,7 +224,7 @@ private:
 
     std::unordered_map<uint32_t, ActorRecord> m_actors;
     Renderer* m_renderer = nullptr;
-    struct VehicleState { float throttle=0,steer=0,brake=0,spin=0,speed=0;bool handbrake=false;float lengths[4]={.45f,.45f,.45f,.45f};int contacts=0;int manualGear=1;std::shared_ptr<VehicleDynamics> dynamics; };
+    struct VehicleState { float throttle=0,steer=0,brake=0,spin=0,speed=0;bool handbrake=false;float lengths[4]={.45f,.45f,.45f,.45f};int contacts=0;int manualGear=1;std::shared_ptr<VehicleDynamics> dynamics;EngineAI::VehicleRoadState road; };
     std::unordered_map<uint32_t,VehicleState> m_vehicles;
     uint32_t m_drivenVehicle=0;
     bool m_vehicleSDK=false;

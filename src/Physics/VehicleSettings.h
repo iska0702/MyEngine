@@ -6,7 +6,14 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 namespace EnginePhysics {
+struct RoadWaypoint {
+    float x=0, y=0, z=0;
+    float speedLimit=8.33f; // metres/second
+    bool stop=false;
+    bool redSignal=false;
+};
 struct VehicleSettings {
     bool enabled=false;
     std::string assembly;
@@ -20,6 +27,8 @@ struct VehicleSettings {
     float longitudinalStiffness=18000,lateralStiffness=65000,wetness=0,rollingResistance=.015f,dragArea=.65f,downforceArea=.15f;
     float ackermann=1,steerRate=2.5f;
     bool automaticGears=true,abs=true,tractionControl=true,weatherGrip=true;
+    bool aiEnabled=false, aiLoop=false;
+    std::vector<RoadWaypoint> route;
     void Sanitize(){
         auto clamp=[](float& v,float lo,float hi,float fallback){v=std::isfinite(v)?(std::clamp)(v,lo,hi):fallback;};
         clamp(wheelbase,.5f,10,2.7f);clamp(track,.5f,6,1.8f);clamp(radius,.1f,2,.36f);
@@ -45,8 +54,12 @@ inline void WriteVehicle(std::ostream& out,const VehicleSettings& s){
     out<<s.reverseRatio<<' '<<s.frontDrive<<' '<<s.differentialBias<<' '<<s.wheelMass<<' '<<s.wheelWidth<<' '<<s.frontBrakeBias<<' '
        <<s.antiRollFront<<' '<<s.antiRollRear<<' '<<s.comHeight<<' '<<s.comForward<<' '<<s.longitudinalStiffness<<' '<<s.lateralStiffness<<' '
        <<s.wetness<<' '<<s.rollingResistance<<' '<<s.dragArea<<' '<<s.downforceArea<<' '<<s.ackermann<<' '<<s.steerRate<<' '<<s.automaticGears<<' '<<s.abs<<' '<<s.tractionControl<<' '<<s.weatherGrip<<'\n';
+    out<<"VEHICLE_AI "<<s.aiEnabled<<' '<<s.aiLoop<<' '<<s.route.size()<<'\n';
+    for(const auto& p:s.route) out<<"VEHICLE_WAYPOINT "<<p.x<<' '<<p.y<<' '<<p.z<<' '<<p.speedLimit<<' '<<p.stop<<' '<<p.redSignal<<'\n';
 }
 inline bool ReadVehicle(const std::string& tag,std::istream& in,VehicleSettings& s){
+    if(tag=="VEHICLE_AI") { bool enabled=false,loop=false; size_t count=0; if(!(in>>enabled>>loop>>count)||count>256) throw std::runtime_error("Invalid vehicle AI settings"); s.aiEnabled=enabled;s.aiLoop=loop;s.route.clear();s.route.reserve(count);return true; }
+    if(tag=="VEHICLE_WAYPOINT") { RoadWaypoint p; if(!(in>>p.x>>p.y>>p.z>>p.speedLimit>>p.stop>>p.redSignal)||!std::isfinite(p.x)||!std::isfinite(p.y)||!std::isfinite(p.z)||!std::isfinite(p.speedLimit)||s.route.size()>=256)throw std::runtime_error("Invalid vehicle waypoint");p.speedLimit=(std::clamp)(p.speedLimit,0.5f,50.f);s.route.push_back(p);return true; }
     if(tag=="VEHICLE_DYNAMICS"){
         auto v=s;int version=0;
         if(!(in>>version)||(version!=1&&version!=2))throw std::runtime_error("Unsupported vehicle dynamics version");
