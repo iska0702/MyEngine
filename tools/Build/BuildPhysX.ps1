@@ -1,7 +1,7 @@
 param([int]$Jobs = 6)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$sdk = Join-Path $root 'ThirdParty/PhysX'
+$sdk = Join-Path $root 'ThirdParty/NVIDIA/PhysX'
 $source = Join-Path $sdk 'physx'
 $cmake = Get-Command cmake -ErrorAction SilentlyContinue
 $ninja = Get-Command ninja -ErrorAction SilentlyContinue

@@ -170,7 +170,7 @@ if (APPLE)
     add_executable(Idontknow MACOSX_BUNDLE ${MACOS_CLIENT_SOURCES})
     target_compile_definitions(Idontknow PRIVATE ENGINE_RELEASE=1 MYENGINE_MACOS=1 _MYENGINE_MACOS=1)
     target_compile_options(Idontknow PRIVATE -Wno-elaborated-enum-base)
-    target_include_directories(Idontknow PRIVATE src/Core src/Renderer src/Input src/Audio src/Storage src/Sequencer ThirdParty/EngineDependencies ThirdParty/EngineDependencies/lua54/lua-5.4.7/src src/Platform/WindowsCompat ThirdParty/discord_social_sdk/include)
+    target_include_directories(Idontknow PRIVATE src/Core src/Renderer src/Input src/Audio src/Storage src/Sequencer ThirdParty/Libraries/EngineDependencies ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src src/Platform/WindowsCompat ThirdParty/Discord/discord_social_sdk/include)
 
     find_library(METAL_FRAMEWORK Metal REQUIRED)
     find_library(METALTKIT_FRAMEWORK MetalKit REQUIRED)
@@ -200,8 +200,8 @@ if (APPLE)
         "${CMAKE_SOURCE_DIR}/src/imgui"
         "${CMAKE_SOURCE_DIR}/src/Platform"
         "${CMAKE_SOURCE_DIR}/src/Platform/DirectXMath"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/PhysX/physx/include"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/steamworks_sdk_165/sdk/public"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/NVIDIA/PhysX/physx/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/Valve/steamworks_sdk_165/sdk/public"
     )
 
     set_target_properties(Idontknow PROPERTIES
@@ -272,8 +272,8 @@ elseif (PS4 OR SONY_PS4 OR ORBIS)
         src/Scene/SceneNode.cpp
         src/Scene/SceneGraph.cpp
         src/Script/ScriptSystem.cpp
-        ThirdParty/EngineDependencies/lua54/lua-5.4.7/src/onelua.c
-        ThirdParty/EngineDependencies/ufbx.c
+        ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src/onelua.c
+        ThirdParty/Libraries/EngineDependencies/ufbx.c
         ${NETWORKING_SOURCES}
     )
 
@@ -283,7 +283,7 @@ elseif (PS4 OR SONY_PS4 OR ORBIS)
         if (DEFINED ENV{OO_PS4_TOOLCHAIN})
             set(OO_PS4_TOOLCHAIN "$ENV{OO_PS4_TOOLCHAIN}")
         else()
-            set(OO_PS4_TOOLCHAIN "${CMAKE_SOURCE_DIR}/ThirdParty/OpenOrbis-PS4-Toolchain")
+            set(OO_PS4_TOOLCHAIN "${CMAKE_SOURCE_DIR}/ThirdParty/OpenSource/OpenOrbis-PS4-Toolchain")
         endif()
     endif()
 
@@ -296,14 +296,14 @@ elseif (PS4 OR SONY_PS4 OR ORBIS)
         "${CMAKE_SOURCE_DIR}/src/Audio"
         "${CMAKE_SOURCE_DIR}/src/Storage"
         "${CMAKE_SOURCE_DIR}/src/Sequencer"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/EngineDependencies"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/Libraries/EngineDependencies"
         "${CMAKE_SOURCE_DIR}/src/Platform"
         "${CMAKE_SOURCE_DIR}/src/Platform/DirectXMath"
         "${CMAKE_SOURCE_DIR}/src/Platform/WindowsCompat"
         "${OO_PS4_TOOLCHAIN}/include"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/PhysX/physx/include"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/steamworks_sdk_165/sdk/public"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/discord_social_sdk/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/NVIDIA/PhysX/physx/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/Valve/steamworks_sdk_165/sdk/public"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/Discord/discord_social_sdk/include"
     )
 
     target_link_directories(Idontknow PRIVATE "${OO_PS4_TOOLCHAIN}/lib")
@@ -344,12 +344,12 @@ if(NOT (PS4 OR SONY_PS4 OR ORBIS))
     target_link_libraries(IdontknowServer PRIVATE Threads::Threads)
     if(WIN32)
         target_link_libraries(IdontknowServer PRIVATE ws2_32 advapi32 bcrypt)
-        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/ThirdParty/MsQuic-2.6.1-OpenSSL/build/native/include/msquic.h")
+        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/include/msquic.h")
             message(FATAL_ERROR "Run tools/Dependencies/FetchMsQuic.ps1 before configuring the Windows server")
         endif()
         add_custom_command(TARGET IdontknowServer POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:IdontknowServer>/ThirdParty/Microsoft/MsQuic"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:IdontknowServer>/ThirdParty/Microsoft/MsQuic/msquic.dll")
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:IdontknowServer>/ThirdParty/Microsoft/MsQuic/msquic.dll")
         target_compile_options(IdontknowServer PRIVATE /utf-8 /EHsc)
     endif()
 endif()
@@ -383,7 +383,7 @@ if(BUILD_TESTING AND TARGET IdontknowServer)
         add_dependencies(TlsRegression IdontknowServer)
         add_custom_command(TARGET TlsRegression POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:TlsRegression>/ThirdParty/Microsoft/MsQuic"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:TlsRegression>/ThirdParty/Microsoft/MsQuic/msquic.dll")
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll" "$<TARGET_FILE_DIR:TlsRegression>/ThirdParty/Microsoft/MsQuic/msquic.dll")
         find_program(IDK_PWSH pwsh)
         if(IDK_PWSH)
             add_test(NAME tls_fixtures COMMAND ${IDK_PWSH} -NoProfile -File "${CMAKE_SOURCE_DIR}/tests/CreateTlsFixtures.ps1")
@@ -422,7 +422,7 @@ if(BUILD_TESTING AND TARGET IdontknowServer)
         target_compile_definitions(CharacterCameraRegression PRIVATE ENGINE_RELEASE=1 NOMINMAX WIN32_LEAN_AND_MEAN)
         target_compile_options(CharacterCameraRegression PRIVATE /utf-8 /EHsc /Gy)
         target_link_options(CharacterCameraRegression PRIVATE /OPT:REF)
-        set(CHARACTER_PHYSX_DIR "${CMAKE_SOURCE_DIR}/ThirdParty/PhysX/Lib/bin/win.x86_64.vc143.md/release")
+        set(CHARACTER_PHYSX_DIR "${CMAKE_SOURCE_DIR}/ThirdParty/NVIDIA/PhysX/Lib/bin/win.x86_64.vc143.md/release")
         foreach(PHYSX_LIB PhysX PhysXCommon PhysXFoundation PhysXExtensions_static PhysXCharacterKinematic_static PhysXPvdSDK_static)
             target_link_libraries(CharacterCameraRegression PRIVATE "${CHARACTER_PHYSX_DIR}/${PHYSX_LIB}.lib")
         endforeach()

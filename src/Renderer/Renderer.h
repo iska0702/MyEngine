@@ -128,6 +128,7 @@ public:
         XMFLOAT3 scale = { 1.0f, 1.0f, 1.0f };
         XMFLOAT4X4 worldMatrix;
         XMFLOAT4X4 previousWorldMatrix;
+        UINT previousTransformFrame = 0;
 
         bool visible = true;
         bool hasCollision = true;
@@ -255,6 +256,7 @@ public:
         XMFLOAT3 scale = { 1.0f, 1.0f, 1.0f };
         XMFLOAT4X4 worldMatrix;
         XMFLOAT4X4 previousWorldMatrix;
+        UINT previousTransformFrame = 0;
 
         bool visible = true;
         bool hasCollision = true;

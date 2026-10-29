@@ -10,6 +10,13 @@ developer ""
 version "1.0.0"
 description ""
 shaderAppId "1dc8ec6e-06fc-4baf-8ed2-832ddbd1e7a1"
+epicProductId ""
+epicSandboxId ""
+epicDeploymentId ""
+epicClientId ""
+epicClientSecret ""
+steamAppId 480
+steamRestart 0
 tuning_gravityX 0
 tuning_gravityY -9.81
 tuning_gravityZ 0

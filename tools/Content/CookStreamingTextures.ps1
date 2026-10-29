@@ -12,7 +12,7 @@ if(!(Test-Path $tool) -or (Get-Item $source).LastWriteTime -gt (Get-Item $tool).
     $bootstrap=$buildText.Substring(0,$buildText.IndexOf(':: Determine Build Target'))
     $job=$bootstrap+@"
 cd /D "$directory"
-cl.exe /nologo /EHsc /O2 /MD /std:c++20 /DUNICODE /D_UNICODE /I"$root/src" /I"$root/ThirdParty/EngineDependencies" /I"$root/ThirdParty/DirectStorage/sdk-package/native/include" "$source" /Fe"$tool" /link d3d12.lib dxgi.lib > compile.log 2>&1
+cl.exe /nologo /EHsc /O2 /MD /std:c++20 /DUNICODE /D_UNICODE /I"$root/src" /I"$root/ThirdParty/Libraries/EngineDependencies" /I"$root/ThirdParty/Microsoft/DirectStorage/sdk-package/native/include" "$source" /Fe"$tool" /link d3d12.lib dxgi.lib > compile.log 2>&1
 exit /b %errorlevel%
 "@
     $batch=Join-Path $directory 'compile.bat';[IO.File]::WriteAllText($batch,$job,[Text.Encoding]::ASCII)
@@ -21,7 +21,7 @@ exit /b %errorlevel%
 }
 
 $content=if($env:IDK_PROJECT_CONTENT){$env:IDK_PROJECT_CONTENT}else{Join-Path $root 'Templates/Default/Content'}
-$runtime=Join-Path $root "$Build/ThirdParty/DirectStorage"
+$runtime=Join-Path $root "$Build/ThirdParty/Microsoft/DirectStorage"
 $staging=[IO.Path]::GetFullPath((Join-Path $directory ("staging-"+$Build)))
 if(!$staging.StartsWith([IO.Path]::GetFullPath($directory).TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Invalid staging directory'}
 if(Test-Path $staging){Remove-Item -LiteralPath $staging -Recurse -Force}

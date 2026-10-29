@@ -147,7 +147,8 @@ bool Prefab::DeserializeFromString(const std::string& data) {
 
             std::istringstream valStream(val);
 
-            if (key == "name") cur.name = val;
+            if (key.rfind("prop ", 0) == 0 && key.size() > 5) cur.properties[key.substr(5)] = val;
+            else if (key == "name") cur.name = val;
             else if (key == "tag") cur.tag = val;
             else if (key == "pos") valStream >> cur.localPosition.x >> cur.localPosition.y >> cur.localPosition.z;
             else if (key == "rot") valStream >> cur.localRotation.x >> cur.localRotation.y >> cur.localRotation.z;

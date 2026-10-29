@@ -5,7 +5,7 @@ $editor=Join-Path $engine 'EditorBuild'
 if(!(Test-Path -LiteralPath (Join-Path $editor 'Idontknow.exe'))){throw 'Build the editor first'}
 if(Get-Process Idontknow -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq (Join-Path $editor 'Idontknow.exe')}){throw 'Close the editor before updating its shader archives'}
 $dxc='D:\Windows Kits\10\bin\10.0.26100.0\x64\dxc.exe'
-if(!(Test-Path -LiteralPath $dxc)){$dxc=Join-Path $engine 'ThirdParty/FidelityFX-SDK-v1.1.4/sdk/tools/ffx_shader_compiler/libs/dxc/bin/x64/dxc.exe'}
+if(!(Test-Path -LiteralPath $dxc)){$dxc=Join-Path $engine 'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/sdk/tools/ffx_shader_compiler/libs/dxc/bin/x64/dxc.exe'}
 $stage=Join-Path $engine ('Diagnostics/ShaderBuilds/'+[Guid]::NewGuid().ToString('N'))
 $archive=Join-Path $engine ('Diagnostics/Archive/ShaderRebuilds/'+[Guid]::NewGuid().ToString('N'))
 $previousRuntime=$env:IDK_RUNTIME_ROOT

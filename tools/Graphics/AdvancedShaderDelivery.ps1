@@ -8,7 +8,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path (Split-Path $PSScriptRoot -Parent) '..'))
-$sdk=Join-Path $root 'ThirdParty/AgilitySDK-1.619.6/build/native/bin/x64'
+$sdk=Join-Path $root 'ThirdParty/Microsoft/AgilitySDK-1.619.6/build/native/bin/x64'
 $compiler=Join-Path $sdk 'D3D12StateObjectCompiler.exe'
 $config=Join-Path $sdk 'd3dconfig.exe'
 function Invoke-Checked([string]$Tool,[string[]]$ToolArguments){

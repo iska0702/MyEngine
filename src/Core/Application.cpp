@@ -655,7 +655,13 @@ void Application::ApplyScene(const std::string& sceneData) {
         }
     }
 
-    for(const auto& volume:loadedVolumes) post.AddVolume(volume);
+    for(const auto& volume:loadedVolumes) {
+        if(EnginePostProcess::IsLegacyAutomaticCryptVolume(volume)) {
+            std::cout<<"[PostProcess] Ignored legacy automatically created Dark Crypt Volume\n";
+            continue;
+        }
+        post.AddVolume(volume);
+    }
     // Migrate the old built-in roof's implicit pyramid collider into explicit asset data once.
     // All normal collider creation uses mesh data and the saved shape, never the model name.
     if(loadedWorldRevision<4) for(auto& model:models)
@@ -873,6 +879,16 @@ int Application::Run() {
     Timer timer;
     unsigned benchmarkFrames = 0;
 #if defined(_WIN32)
+#if defined(ENGINE_EDITOR)
+    if (m_benchmarkFrameLimit && GetEnvironmentVariableW(L"IDK_BENCHMARK_VFX", nullptr, 0) > 0) {
+        const auto pos = m_camera->GetPosition();
+        const auto forward = m_camera->GetForwardVector();
+        XMFLOAT3 target{pos.x + forward.x * 2.0f, pos.y + forward.y * 2.0f, pos.z + forward.z * 2.0f};
+        EngineVFX::ParticleSystem::Get().SpawnFire(target);
+        target.x += 1.0f;
+        EngineVFX::ParticleSystem::Get().SpawnSmoke(target, 0.0f);
+    }
+#endif
     if (m_benchmarkFrameLimit && GetEnvironmentVariableW(L"IDK_BENCHMARK_DYNAMIC_GEOMETRY", nullptr, 0) > 0) {
         const std::vector<Renderer::Vertex> vertices = {
             {{-5.f,1.f,0.f},{0.f,0.f,-1.f},{1.f,1.f,0.f,0.f}},
@@ -939,6 +955,16 @@ int Application::Run() {
     if(m_benchmarkFrameLimit && m_benchmarkGI>=0){m_renderer->SetSSGIEnabled(m_benchmarkGI>0);m_renderer->SetSSGIIntensity(m_benchmarkGI);}
 #if defined(ENGINE_EDITOR)
     if(m_benchmarkEditorWorkflow&&m_benchmarkFrameLimit&&!RunEditorWorkflowChecks())return 8;
+#if defined(_WIN32)
+    if(m_benchmarkFrameLimit){
+        char hiddenModel[256]{};
+        const DWORD length=GetEnvironmentVariableA("IDK_BENCHMARK_HIDE_MODEL",hiddenModel,sizeof(hiddenModel));
+        if(length>0&&length<sizeof(hiddenModel)){
+            for(auto& model:m_renderer->GetModels())if(model.name==hiddenModel)model.visible=false;
+            for(auto& model:m_renderer->GetDynamicModels())if(model.name==hiddenModel)model.visible=false;
+        }
+    }
+#endif
 #endif
     bool prevF11 = false;
     bool prevTab = false;
@@ -6085,6 +6111,19 @@ int Application::Run() {
                         std::ofstream world(output / "benchmark_world.txt");
                         for (const auto& model : m_renderer->GetModels()) world << model.name << '\n';
                         for (const auto& model : m_renderer->GetDynamicModels()) world << "DYNAMIC " << model.name << '\n';
+                        std::ofstream details(output / "benchmark_world_details.txt");
+                        auto writeModel=[&](const auto& model,const char* kind){
+                            details<<kind<<" name="<<std::quoted(model.name)<<" geometry="<<std::quoted(model.geometryName)
+                                   <<" visible="<<model.visible<<" position="<<model.position.x<<','<<model.position.y<<','<<model.position.z
+                                   <<" rotation="<<model.rotation.x<<','<<model.rotation.y<<','<<model.rotation.z
+                                   <<" scale="<<model.scale.x<<','<<model.scale.y<<','<<model.scale.z<<'\n';
+                        };
+                        for(const auto& model:m_renderer->GetModels())writeModel(model,"model");
+                        for(const auto& model:m_renderer->GetDynamicModels())writeModel(model,"dynamic");
+                        for(const auto& volume:EnginePostProcess::PostProcessSystem::Get().GetVolumes())
+                            details<<"post_volume name="<<std::quoted(volume.name)<<" center="<<volume.center.x<<','<<volume.center.y<<','<<volume.center.z
+                                   <<" extents="<<volume.extents.x<<','<<volume.extents.y<<','<<volume.extents.z
+                                   <<" exposure="<<volume.settings.exposure<<" contrast="<<volume.settings.contrast<<'\n';
 #endif
                         break;
                     }

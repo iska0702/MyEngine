@@ -49,8 +49,8 @@ set(CLIENT_COMMON_SOURCES
     src/Input/DualShock.cpp
     src/Audio/DualSenseAudio.cpp
     src/Audio/AudioSystem.cpp
-    ThirdParty/EngineDependencies/ufbx.c
-    ThirdParty/EngineDependencies/lua54/lua-5.4.7/src/onelua.c
+    ThirdParty/Libraries/EngineDependencies/ufbx.c
+    ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src/onelua.c
     src/Networking/BitWriter.cpp
     src/Networking/BitReader.cpp
     src/Networking/Packet.cpp

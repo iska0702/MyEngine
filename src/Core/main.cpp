@@ -17,7 +17,7 @@
 // D3D12 loads the matching signed Agility runtime before device creation.
 extern "C" {
 __declspec(dllexport) extern const UINT D3D12SDKVersion=619;
-__declspec(dllexport) extern const char* D3D12SDKPath=".\\ThirdParty\\DirectX\\Agility\\";
+__declspec(dllexport) extern const char* D3D12SDKPath=".\\ThirdParty\\Microsoft\\Agility\\";
 }
 #include "Security/SecuritySystem.h"
 #include <shlwapi.h>
@@ -170,11 +170,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     std::wstring epicDir = std::wstring(exeDir) + L"\\ThirdParty\\EpicOnlineServices";
     std::wstring discordDir = std::wstring(exeDir) + L"\\ThirdParty\\Discord";
     std::wstring nvDir = std::wstring(exeDir) + L"\\ThirdParty\\NVIDIA\\Streamline";
-    std::wstring dxDir = std::wstring(exeDir) + L"\\ThirdParty\\DirectX";
+    std::wstring dxDir = std::wstring(exeDir) + L"\\ThirdParty\\Microsoft\\DirectX";
+    std::wstring webViewDir = std::wstring(exeDir) + L"\\ThirdParty\\Microsoft\\WebView2";
     std::wstring pxDir = std::wstring(exeDir) + L"\\ThirdParty\\NVIDIA\\PhysX";
     std::wstring amdDir = std::wstring(exeDir) + L"\\ThirdParty\\AMD";
     std::wstring intelDir = std::wstring(exeDir) + L"\\ThirdParty\\Intel";
-    std::wstring dsDir = std::wstring(exeDir) + L"\\ThirdParty\\DirectStorage";
+    std::wstring dsDir = std::wstring(exeDir) + L"\\ThirdParty\\Microsoft\\DirectStorage";
 
     // Enable Per-Monitor V2 DPI awareness so fullscreen and window resolutions match physical display pixels exactly
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -186,6 +187,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     AddDllDirectory(discordDir.c_str());
     AddDllDirectory(nvDir.c_str());
     AddDllDirectory(dxDir.c_str());
+    AddDllDirectory(webViewDir.c_str());
     AddDllDirectory(pxDir.c_str());
     AddDllDirectory(amdDir.c_str());
     AddDllDirectory(intelDir.c_str());

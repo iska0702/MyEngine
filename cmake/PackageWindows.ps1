@@ -41,24 +41,23 @@ if ($Platform -ne 'STEAM') {
     }
 }
 $copies = @{
-    'ThirdParty/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll' = 'ThirdParty/Microsoft/MsQuic'
-    'ThirdParty/steamworks_sdk_165/sdk/redistributable_bin/win64/steam_api64.dll' = 'ThirdParty/Steamworks'
-    'ThirdParty/EOS-SDK-58105819-Release-v1.19.2.1/SDK/Bin/EOSSDK-Win64-Shipping.dll' = 'ThirdParty/EpicOnlineServices'
+    'ThirdParty/Microsoft/MsQuic-2.6.1-OpenSSL/build/native/bin/x64/msquic.dll' = 'ThirdParty/Microsoft/MsQuic'
+    'ThirdParty/Valve/steamworks_sdk_165/sdk/redistributable_bin/win64/steam_api64.dll' = 'ThirdParty/Steamworks'
+    'ThirdParty/EpicGames/EOS-SDK-58105819-Release-v1.19.2.1/SDK/Bin/EOSSDK-Win64-Shipping.dll' = 'ThirdParty/EpicOnlineServices'
     'ThirdParty/Steamworks/lib/x64/*.dll' = 'ThirdParty/Steamworks'
-    'ThirdParty/PhysX/Lib/bin/win.x86_64.vc143.md/release/*.dll' = 'ThirdParty/NVIDIA/PhysX'
-    'ThirdParty/discord_social_sdk/bin/release/*.dll' = 'ThirdParty/Discord'
-    'ThirdParty/discord_social_sdk/bin/release/*.kef' = 'ThirdParty/Discord'
-    'ThirdParty/streamline-sdk-v2.14.1/bin/x64/*.dll' = 'ThirdParty/NVIDIA/Streamline'
-    'ThirdParty/XeSS_SDK_3.0.2/bin/*.dll' = 'ThirdParty/Intel'
-    'ThirdParty/DirectStorage/sdk-package/native/bin/x64/*.dll' = 'ThirdParty/DirectStorage'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/bin/amd_*.dll' = 'ThirdParty/AMD'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/bin/dx*.dll' = 'ThirdParty/DirectX'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/bin/D3D12/D3D12Core.dll' = 'ThirdParty/DirectX'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/bin/WinPixEventRuntime.dll' = 'ThirdParty/DirectX'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/amd_*.dll' = 'ThirdParty/AMD'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/dx*.dll' = 'ThirdParty/DirectX'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/D3D12Core.dll' = 'ThirdParty/DirectX'
-    'ThirdParty/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/WinPixEventRuntime.dll' = 'ThirdParty/DirectX'
+    'ThirdParty/NVIDIA/PhysX/Lib/bin/win.x86_64.vc143.md/release/*.dll' = 'ThirdParty/NVIDIA/PhysX'
+    'ThirdParty/Discord/discord_social_sdk/bin/release/*.dll' = 'ThirdParty/Discord'
+    'ThirdParty/Discord/discord_social_sdk/bin/release/*.kef' = 'ThirdParty/Discord'
+    'ThirdParty/NVIDIA/streamline-sdk-v2.14.1/bin/x64/*.dll' = 'ThirdParty/NVIDIA/Streamline'
+    'ThirdParty/Intel/XeSS_SDK_3.0.2/bin/*.dll' = 'ThirdParty/Intel'
+    'ThirdParty/Microsoft/DirectStorage/sdk-package/native/bin/x64/*.dll' = 'ThirdParty/Microsoft/DirectStorage'
+    'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/bin/amd_*.dll' = 'ThirdParty/AMD'
+    'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/bin/dx*.dll' = 'ThirdParty/Microsoft/DirectX'
+    'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/bin/WinPixEventRuntime.dll' = 'ThirdParty/Microsoft/DirectX'
+    'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/amd_*.dll' = 'ThirdParty/AMD'
+    'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/dx*.dll' = 'ThirdParty/Microsoft/DirectX'
+    'ThirdParty/Microsoft/WebView2/build/native/x64/WebView2Loader.dll' = 'ThirdParty/Microsoft/WebView2'
+    'ThirdParty/AMD/FidelityFX-SDK-v1.1.4/PrebuiltSignedDLL/WinPixEventRuntime.dll' = 'ThirdParty/Microsoft/DirectX'
 }
 # Remove legacy Epic naming and the inactive platform's generated runtime folder.
 $obsoletePlatforms = @('ThirdParty/Epic')
@@ -72,9 +71,9 @@ foreach ($relative in $obsoletePlatforms) {
     }
 }
 $requiredRuntime = if ($Platform -eq 'EPIC') {
-    'ThirdParty/EOS-SDK-58105819-Release-v1.19.2.1/SDK/Bin/EOSSDK-Win64-Shipping.dll'
+    'ThirdParty/EpicGames/EOS-SDK-58105819-Release-v1.19.2.1/SDK/Bin/EOSSDK-Win64-Shipping.dll'
 } elseif ($Platform -eq 'STEAM') {
-    'ThirdParty/steamworks_sdk_165/sdk/redistributable_bin/win64/steam_api64.dll'
+    'ThirdParty/Valve/steamworks_sdk_165/sdk/redistributable_bin/win64/steam_api64.dll'
 } else { $null }
 if ($requiredRuntime -and !(Test-Path -LiteralPath (Join-Path $sourceRoot $requiredRuntime))) { throw "Missing platform runtime: $requiredRuntime" }
 foreach ($entry in $copies.GetEnumerator()) {
@@ -88,14 +87,14 @@ foreach ($entry in $copies.GetEnumerator()) {
 }
 $streamlinePix = Join-Path $outputRoot 'ThirdParty/NVIDIA/Streamline/WinPixEventRuntime.dll'
 if (Test-Path -LiteralPath $streamlinePix) {
-    $directX = Join-Path $outputRoot 'ThirdParty/DirectX'
+    $directX = Join-Path $outputRoot 'ThirdParty/Microsoft/DirectX'
     New-Item -ItemType Directory -Force -Path $directX | Out-Null
     Move-Item -LiteralPath $streamlinePix -Destination (Join-Path $directX 'WinPixEventRuntime.dll') -Force
 }
 $vkDll = Join-Path $outputRoot 'ThirdParty/AMD/amd_fidelityfx_vk.dll'
-# Keep the Agility runtime isolated from vendor-bundled D3D12Core versions.
-$agility=Join-Path $sourceRoot 'ThirdParty/AgilitySDK-1.619.6/build/native/bin/x64'
-$agilityOutput=Join-Path $outputRoot 'ThirdParty/DirectX/Agility'
+# The application explicitly loads the pinned Agility runtime.
+$agility=Join-Path $sourceRoot 'ThirdParty/Microsoft/AgilitySDK-1.619.6/build/native/bin/x64'
+$agilityOutput=Join-Path $outputRoot 'ThirdParty/Microsoft/Agility'
 New-Item -ItemType Directory -Path $agilityOutput -Force | Out-Null
 foreach($name in @('D3D12Core.dll','d3d12SDKLayers.dll')) {
     $source=Join-Path $agility $name

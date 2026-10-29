@@ -81,7 +81,8 @@ private:
     std::shared_ptr<EngineScene::SceneNode> BuildNodeHierarchy(
         const PrefabNodeData& data,
         std::shared_ptr<EngineScene::SceneNode> parent,
-        Renderer* renderer
+        Renderer* renderer,
+        const std::string& prefabName
     );
 };
 

@@ -3,7 +3,7 @@
 #include "FidelityFXSystem.h"
 #include <wrl/client.h>
 #include <atomic>
-#include "../../../ThirdParty/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_framegeneration.h"
+#include "../../../ThirdParty/AMD/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_framegeneration.h"
 namespace EngineRender {
 class FidelityFXFrameGeneration {
     HMODULE module=nullptr;

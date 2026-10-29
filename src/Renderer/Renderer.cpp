@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "AdvancedShaderDelivery.h"
 #include "Debug/Profiler.h"
+#include "VFX/ParticleSystem.h"
 #include "DxrTransform.h"
 #include "Common/SceneLighting.h"
 #include "Core/DiagnosticPaths.h"
@@ -4160,6 +4161,8 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
     }
 
     EngineRain::RainSystem::Get().Initialize(m_device.Get());
+    if (!EngineVFX::ParticleSystem::Get().Initialize(m_device.Get()))
+        std::cerr << "[VFX] Particle rendering initialization failed; effects will not be visible.\n";
     InitXeSS();InitDirectStorage();InitFSR2();if(m_upscaleTechnique!=UpscaleTechnique::FSR)ShutdownFSR2();
 
     m_pipelineCache.Flush();
@@ -5539,6 +5542,10 @@ void Renderer::Render(float dt) {
         SceneConstantBuffer cbData = m_constantBufferData;
         cbData.viewProj = m_viewProj;
         cbData.model = m_cullingProbeOutside?XMMatrixTranslation(100000,0,0):XMLoadFloat4x4(&model.worldMatrix);
+        cbData.previousModel = model.previousTransformFrame && model.previousTransformFrame + 1 == m_frameCounter
+            ? XMLoadFloat4x4(&model.previousWorldMatrix) : cbData.model;
+        XMStoreFloat4x4(&model.previousWorldMatrix, cbData.model);
+        model.previousTransformFrame = m_frameCounter;
         cbData.startIndexLocation = model.startIndexLocation;
         cbData.baseVertexLocation = model.baseVertexLocation;
         cbData.triangleCount = model.indexCount / 3;
@@ -5599,6 +5606,10 @@ void Renderer::Render(float dt) {
         SceneConstantBuffer cbData = m_constantBufferData;
         cbData.viewProj = m_viewProj;
         cbData.model = m_cullingProbeOutside?XMMatrixTranslation(100000,0,0):world;
+        cbData.previousModel = model.previousTransformFrame && model.previousTransformFrame + 1 == m_frameCounter
+            ? XMLoadFloat4x4(&model.previousWorldMatrix) : cbData.model;
+        XMStoreFloat4x4(&model.previousWorldMatrix, cbData.model);
+        model.previousTransformFrame = m_frameCounter;
         cbData.startIndexLocation = 0;
         cbData.baseVertexLocation = 0;
         cbData.triangleCount = model.indexCount / 3;
@@ -6173,6 +6184,26 @@ void Renderer::Render(float dt) {
         Transition(m_commandList.Get(), targetTex, targetState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     }
 
+    // Transparent particles use scene depth and the same HDR target as rain.
+    auto& particles = EngineVFX::ParticleSystem::Get();
+    if (particles.GetActiveEmitterCount() > 0) {
+        const bool hasComposited = doComposite && m_compositedColorTexture;
+        ID3D12Resource* target = hasComposited ? m_compositedColorTexture.Get() : m_sceneColorTexture.Get();
+        D3D12_RESOURCE_STATES& state = hasComposited ? m_compositedColorState : m_sceneColorState;
+        const UINT index = hasComposited ? m_compositedColorRtvIndex : m_sceneColorRtvIndex;
+        Transition(m_commandList.Get(), target, state, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        Transition(m_commandList.Get(), m_depthStencilBuffer.Get(), m_depthStencilState, D3D12_RESOURCE_STATE_DEPTH_READ);
+        auto rtv = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+        rtv.ptr += index * m_rtvDescriptorSize;
+        auto dsv = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
+        m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+        D3D12_VIEWPORT viewport = {0.f, 0.f, float(m_renderWidth), float(m_renderHeight), 0.f, 1.f};
+        D3D12_RECT scissor = {0, 0, m_renderWidth, m_renderHeight};
+        m_commandList->RSSetViewports(1, &viewport);
+        m_commandList->RSSetScissorRects(1, &scissor);
+        particles.Render(m_commandList.Get(), m_viewProj, m_camera->GetPosition(), m_constantBufferData.cloudTime);
+        Transition(m_commandList.Get(), target, state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    }
     gpuStamp(8);
     m_dlssActive = false;
     bool upscalingSuccess = false;
@@ -6622,6 +6653,7 @@ void Renderer::BeginUI() {
 void Renderer::Destroy() {
     if(m_textureStreamer)m_textureStreamer->Shutdown();
     if(m_commandQueue&&m_fence)WaitForPreviousFrame();
+    EngineVFX::ParticleSystem::Get().Shutdown();
     ReportBackendStatistics();
     m_pipelineCache.Shutdown();
     if(m_tessellatedDraws&&m_tessellationStatistics){

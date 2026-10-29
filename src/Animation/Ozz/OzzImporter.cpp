@@ -1,6 +1,6 @@
 #include "OzzImporter.h"
 #include "OzzSerializer.h"
-#include "ThirdParty/ufbx.h"
+#include "ThirdParty/Libraries/ufbx.h"
 #include <iostream>
 #include <functional>
 #include <unordered_map>

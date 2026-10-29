@@ -1,4 +1,5 @@
 #include "ProjectBuilder.h"
+#include "ProjectBuildRename.h"
 #if defined(_WIN32) && defined(ENGINE_EDITOR)
 #include "Project.h"
 #include "EngineLog.h"
@@ -167,6 +168,7 @@ void ProjectBuilder::InstallRuntime(const fs::path& sourceBuild,const std::strin
 }
 void ProjectBuilder::Run(fs::path projectFile,std::string platform){
     fs::path stage,stageParent;std::ofstream logfile;
+    bool preserveStage=false;
     auto checkpoint=[&]{if(state->cancel||EngineLog::closeRequested)throw Cancelled();};
     auto log=[&](const std::string& text){std::cout<<"[Build] "<<text<<std::endl;if(logfile){logfile<<text<<'\n';logfile.flush();}std::lock_guard<std::mutex> lock(state->mutex);auto& lines=state->snapshot.lines;if(lines.size()>=500)lines.erase(lines.begin());lines.push_back(text);};
     auto phase=[&](const std::string& name,float progress){checkpoint();{std::lock_guard<std::mutex> lock(state->mutex);state->snapshot.phase=name;state->snapshot.progress=progress;}log(name);};
@@ -204,7 +206,7 @@ void ProjectBuilder::Run(fs::path projectFile,std::string platform){
         const auto shaders=stage/".work/Runtime/ShaderLibrary";for(auto& name:ArchiveNames(shaders/"content01.pak")){auto bytes=EngineStorage::ReadContentArchive(name,shaders);if(bytes.empty())throw std::runtime_error("Runtime shader data failed authentication");assets.push_back({name,{},std::move(bytes)});}
         phase("Cooking streaming textures",.38f);std::vector<CookedTexture> textures;
         for(auto& [name,source]:images){checkpoint();if(name.size()>127)throw std::runtime_error("Streaming texture path exceeds 127 UTF-8 bytes: "+name);log("Texture: "+name);auto cooked=stage/".work/Cooked"/(std::to_string(textures.size())+".gdst");
-            auto modified=fs::last_write_time(source);CookTexture(stage/".work/Runtime/Tools/CookStreamingTexture.exe",source,cooked,stage/"ThirdParty/DirectStorage",checkpoint,log);if(fs::last_write_time(source)!=modified)throw std::runtime_error("Texture changed while cooking; retry the build");
+            auto modified=fs::last_write_time(source);CookTexture(stage/".work/Runtime/Tools/CookStreamingTexture.exe",source,cooked,stage/"ThirdParty/Microsoft/DirectStorage",checkpoint,log);if(fs::last_write_time(source)!=modified)throw std::runtime_error("Texture changed while cooking; retry the build");
             auto bytes=EngineStorage::ReadBuildInput(cooked);if(bytes.size()<32)throw std::runtime_error("Cooked texture is truncated");EngineStorage::StreamingTextureHeader header;std::memcpy(&header,bytes.data(),32);
             if(header.magic!=0x58545347||header.version!=1||!header.compressedBytes||header.compressedBytes+32ull!=bytes.size()||!header.width||!header.height||header.width>16384||header.height>16384||!header.mips||header.mips>15||header.format!=28||header.rawBytes>256u*1024*1024)throw std::runtime_error("Invalid cooked texture");
             CookedTexture texture;std::memcpy(texture.entry.name,name.c_str(),name.size()+1);texture.entry.compressedBytes=header.compressedBytes;texture.entry.rawBytes=header.rawBytes;texture.entry.width=header.width;texture.entry.height=header.height;texture.entry.mips=header.mips;texture.entry.format=header.format;texture.source=cooked;textures.push_back(std::move(texture));}
@@ -219,12 +221,20 @@ void ProjectBuilder::Run(fs::path projectFile,std::string platform){
             if(fs::is_regular_file(output/"Idontknow.exe")){Handle writable;writable.value=CreateFileW((output/"Idontknow.exe").c_str(),GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);if(writable.value==INVALID_HANDLE_VALUE)throw std::runtime_error("Close the running project game before replacing its Build");}
             RejectLink(output);for(auto& file:fs::directory_iterator(output))if(file.path().filename()!="Contents"&&file.path().filename()!="ThirdParty"&&file.path().filename()!="Idontknow.exe")throw std::runtime_error("Build contains unrelated files; choose a clean generated Build directory");
             const auto history=project.Resolve("Saved/BuildHistory");fs::create_directories(history);const auto previous=history/id;
-            fs::rename(output,previous);try{fs::rename(stage,output);}catch(...){fs::rename(previous,output);throw;}log("Previous Build preserved: "+Utf8(previous));
-        }else fs::rename(stage,output);
+            if(auto error=RenameBuildDirectory(output,previous))throw std::runtime_error("Cannot move the previous Build ("+error.message()+"). Close the game and any program using the Build folder, then retry.");
+            if(auto error=RenameBuildDirectory(stage,output)){
+                if(auto restoreError=RenameBuildDirectory(previous,output)){
+                    preserveStage=true;
+                    throw std::runtime_error("Cannot publish Build ("+error.message()+") or restore previous Build ("+restoreError.message()+"). Previous Build: "+Utf8(previous)+"; new Build: "+Utf8(stage));
+                }
+                throw std::runtime_error("Cannot publish Build ("+error.message()+"). Previous Build restored. Close programs using the Build folder and retry.");
+            }
+            log("Previous Build preserved: "+Utf8(previous));
+        }else if(auto error=RenameBuildDirectory(stage,output))throw std::runtime_error("Cannot publish Build ("+error.message()+"). Close programs using the Build folder and retry.");
         log("Build ready: "+Utf8(output/"Idontknow.exe"));{std::lock_guard<std::mutex> guard(state->mutex);state->snapshot.succeeded=true;state->snapshot.progress=1;state->snapshot.phase="Build completed";}
     }catch(const Cancelled&){log("Build cancelled; previous Build preserved");std::lock_guard<std::mutex> guard(state->mutex);state->snapshot.cancelled=true;state->snapshot.phase="Build cancelled";}
     catch(const std::exception& error){log(std::string("Build failed: ")+error.what());std::lock_guard<std::mutex> guard(state->mutex);state->snapshot.error=error.what();state->snapshot.phase="Build failed";}
-    try{if(!stage.empty()&&fs::exists(stage))RemoveOwnedStage(stage,stageParent);if(!stageParent.empty()&&fs::exists(stageParent)&&fs::is_empty(stageParent))fs::remove(stageParent);}catch(const std::exception& error){log(std::string("Staging cleanup: ")+error.what());}
+    try{if(!preserveStage&&!stage.empty()&&fs::exists(stage))RemoveOwnedStage(stage,stageParent);if(!stageParent.empty()&&fs::exists(stageParent)&&fs::is_empty(stageParent))fs::remove(stageParent);}catch(const std::exception& error){log(std::string("Staging cleanup: ")+error.what());}
     std::lock_guard<std::mutex> guard(state->mutex);state->snapshot.running=false;
 }
 }

@@ -10,10 +10,10 @@ static void Check(bool ok,const char* why){if(!ok)throw std::runtime_error(why);
 static void Write(const fs::path& path,const std::string& text){fs::create_directories(path.parent_path());std::ofstream out(path,std::ios::binary);out<<text;Check(bool(out),"Fixture write failed");}
 int wmain(int argc,wchar_t** argv){try{
     Check(argc==4,"Source build, cooker and fixture directory required");auto source=fs::absolute(argv[1]),cooker=fs::absolute(argv[2]),root=fs::absolute(argv[3]);
-    const auto minimal=root/"RuntimeSource";fs::create_directories(minimal/"Contents");fs::create_directories(minimal/"ThirdParty/DirectStorage");
+    const auto minimal=root/"RuntimeSource";fs::create_directories(minimal/"Contents");fs::create_directories(minimal/"ThirdParty/Microsoft/DirectStorage");
     fs::copy_file(source/"Idontknow.exe",minimal/"Idontknow.exe",fs::copy_options::overwrite_existing);
     for(auto& entry:fs::directory_iterator(source/"Contents"))if(entry.path().filename()!="content10.pak")fs::copy_file(entry.path(),minimal/"Contents"/entry.path().filename(),fs::copy_options::overwrite_existing);
-    for(auto& entry:fs::directory_iterator(source/"ThirdParty/DirectStorage"))if(entry.is_regular_file())fs::copy_file(entry.path(),minimal/"ThirdParty/DirectStorage"/entry.path().filename(),fs::copy_options::overwrite_existing);
+    for(auto& entry:fs::directory_iterator(source/"ThirdParty/Microsoft/DirectStorage"))if(entry.is_regular_file())fs::copy_file(entry.path(),minimal/"ThirdParty/Microsoft/DirectStorage"/entry.path().filename(),fs::copy_options::overwrite_existing);
     ProjectBuilder::InstallRuntime(minimal,"standalone",cooker);
     Project project;project.file=root/L"Проект с пробелами"/"Game Test.idkp";project.name="Native build fixture";project.content="Assets";project.editorScene="Assets/Scene.save";project.mainMenu="Assets/UI/menu.html";project.splash="Presentation.html";
     fs::create_directories(project.Resolve(project.content));Write(project.Resolve(project.mainMenu),"<html>Native menu fixture</html>");Write(project.Resolve(project.splash),"<html>Splash fixture</html>");

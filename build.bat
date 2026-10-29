@@ -195,7 +195,7 @@ exit /b !errorlevel!
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Dependencies\FetchMsQuic.ps1"
 if errorlevel 1 exit /b 1
 
-if not exist "%~dp0ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysX.lib" (
+if not exist "%~dp0ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysX.lib" (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Build\BuildPhysX.ps1"
     if errorlevel 1 exit /b 1
 )
@@ -220,11 +220,11 @@ if exist DLL (
 )
 if not exist ThirdParty\Discord mkdir ThirdParty\Discord
 if not exist ThirdParty\NVIDIA\Streamline mkdir ThirdParty\NVIDIA\Streamline
-if not exist ThirdParty\DirectX mkdir ThirdParty\DirectX
+if not exist ThirdParty\Microsoft\DirectX mkdir ThirdParty\Microsoft\DirectX
 if not exist ThirdParty\NVIDIA\PhysX mkdir ThirdParty\NVIDIA\PhysX
 if not exist ThirdParty\AMD mkdir ThirdParty\AMD
 if not exist ThirdParty\Intel mkdir ThirdParty\Intel
-if not exist ThirdParty\DirectStorage mkdir ThirdParty\DirectStorage
+if not exist ThirdParty\Microsoft\DirectStorage mkdir ThirdParty\Microsoft\DirectStorage
 
 :: Clean up any legacy loose files in target directory
 if exist UI rmdir /S /Q UI > nul 2>&1
@@ -317,7 +317,7 @@ if exist Contents\world.pak del /Q Contents\world.pak > nul 2>&1
 if exist Contents\*.level del /Q Contents\*.level > nul 2>&1
 
 :: Source files list including Networking and Epic/Steam
-set SOURCES=..\src\Core\main.cpp ..\src\Core\ProjectBuilder.cpp ..\src\Core\Application.cpp ..\src\Core\Window.cpp ..\src\Renderer\Renderer.cpp ..\src\Upscaling\XeSS\XeSSSystem.cpp ..\src\Storage\DirectStorage\DirectStorageSystem.cpp ..\src\Platform\PlatformUtils.cpp ..\src\Storage\PakCompression.cpp ..\src\Renderer\ModelLoader.cpp ..\src\Renderer\Camera.cpp ..\src\Renderer\CameraSystem.cpp ..\src\Core\Timer.cpp ..\src\Renderer\TextureStreamer.cpp ..\src\Renderer\Texture.cpp ..\src\Sequencer\Sequencer.cpp ..\src\Security\SecuritySystem.cpp ..\src\Security\MBAObfuscator.cpp ..\src\Security\VirtualMachine.cpp ..\src\Security\HardwareID.cpp ..\src\Security\LicenseSystem.cpp ..\src\Rain\RainSystem.cpp ..\src\Rain\WeatherSystem.cpp ..\src\Physics\PhysicsSystem.cpp ..\src\Physics\ClothSystem.cpp ..\src\Physics\HairSystem.cpp ..\src\Physics\CharacterController.cpp ..\src\UI\WebMenuSystem.cpp ..\src\UI\ContentBrowser.cpp ..\src\Level\LevelSystem.cpp ..\src\Storage\SaveSystem.cpp ..\src\Steam\SteamSystem.cpp ..\src\Epic\EpicSystem.cpp ..\src\Discord\DiscordSystem.cpp ..\src\Animation\SkinnedMesh.cpp ..\src\Animation\CharacterAsset.cpp ..\src\Animation\AnimationSystem.cpp ..\src\Animation\BoneClassifierAI.cpp ..\src\Animation\BoneMappingWindow.cpp ..\src\Animation\Ozz\OzzRuntime.cpp ..\src\Animation\Ozz\OzzSerializer.cpp ..\src\Animation\Ozz\OzzImporter.cpp ..\src\Animation\MotionMatching\MotionDatabase.cpp ..\src\Animation\MotionMatching\MotionTrajectory.cpp ..\src\Animation\MotionMatching\MotionMatcher.cpp ..\src\Animation\MotionMatching\MotionController.cpp ..\src\Input\DualSense.cpp ..\src\Input\DualShock.cpp ..\src\Audio\DualSenseAudio.cpp ..\src\Audio\AudioSystem.cpp ..\ThirdParty\EngineDependencies\ufbx.c ..\ThirdParty\EngineDependencies\lua54\lua-5.4.7\src\onelua.c ..\src\Networking\BitWriter.cpp ..\src\Networking\BitReader.cpp ..\src\Networking\Packet.cpp ..\src\Networking\NetworkSocket.cpp ..\src\Networking\NetworkConnection.cpp ..\src\Networking\NetworkObject.cpp ..\src\Networking\NetworkReplication.cpp ..\src\Networking\ServerAntiCheat.cpp ..\src\Networking\ClientAntiCheat.cpp ..\src\Networking\NetworkServer.cpp ..\src\Networking\NetworkClient.cpp ..\src\Networking\MultiplayerManager.cpp ..\src\Scene\SceneNode.cpp ..\src\Scene\SceneGraph.cpp ..\src\Script\ScriptSystem.cpp ..\src\AI\NavMesh.cpp ..\src\AI\NavAgent.cpp ..\src\AI\NavigationSystem.cpp ..\src\VFX\ParticleEmitter.cpp ..\src\VFX\ParticleSystem.cpp ..\src\Terrain\TerrainSystem.cpp ..\src\PostProcess\PostProcessSystem.cpp ..\src\Asset\AssetRegistry.cpp ..\src\Prefab\Prefab.cpp ..\src\Prefab\PrefabSystem.cpp ..\src\Debug\Profiler.cpp ..\src\Debug\DebugConsole.cpp ..\src\Input\InputMapping.cpp
+set SOURCES=..\src\Core\main.cpp ..\src\Core\ProjectBuilder.cpp ..\src\Core\Application.cpp ..\src\Core\Window.cpp ..\src\Renderer\Renderer.cpp ..\src\Upscaling\XeSS\XeSSSystem.cpp ..\src\Storage\DirectStorage\DirectStorageSystem.cpp ..\src\Platform\PlatformUtils.cpp ..\src\Storage\PakCompression.cpp ..\src\Renderer\ModelLoader.cpp ..\src\Renderer\Camera.cpp ..\src\Renderer\CameraSystem.cpp ..\src\Core\Timer.cpp ..\src\Renderer\TextureStreamer.cpp ..\src\Renderer\Texture.cpp ..\src\Sequencer\Sequencer.cpp ..\src\Security\SecuritySystem.cpp ..\src\Security\MBAObfuscator.cpp ..\src\Security\VirtualMachine.cpp ..\src\Security\HardwareID.cpp ..\src\Security\LicenseSystem.cpp ..\src\Rain\RainSystem.cpp ..\src\Rain\WeatherSystem.cpp ..\src\Physics\PhysicsSystem.cpp ..\src\Physics\ClothSystem.cpp ..\src\Physics\HairSystem.cpp ..\src\Physics\CharacterController.cpp ..\src\UI\WebMenuSystem.cpp ..\src\UI\ContentBrowser.cpp ..\src\Level\LevelSystem.cpp ..\src\Storage\SaveSystem.cpp ..\src\Steam\SteamSystem.cpp ..\src\Epic\EpicSystem.cpp ..\src\Discord\DiscordSystem.cpp ..\src\Animation\SkinnedMesh.cpp ..\src\Animation\CharacterAsset.cpp ..\src\Animation\AnimationSystem.cpp ..\src\Animation\BoneClassifierAI.cpp ..\src\Animation\BoneMappingWindow.cpp ..\src\Animation\Ozz\OzzRuntime.cpp ..\src\Animation\Ozz\OzzSerializer.cpp ..\src\Animation\Ozz\OzzImporter.cpp ..\src\Animation\MotionMatching\MotionDatabase.cpp ..\src\Animation\MotionMatching\MotionTrajectory.cpp ..\src\Animation\MotionMatching\MotionMatcher.cpp ..\src\Animation\MotionMatching\MotionController.cpp ..\src\Input\DualSense.cpp ..\src\Input\DualShock.cpp ..\src\Audio\DualSenseAudio.cpp ..\src\Audio\AudioSystem.cpp ..\ThirdParty\Libraries\EngineDependencies\ufbx.c ..\ThirdParty\Libraries\EngineDependencies\lua54\lua-5.4.7\src\onelua.c ..\src\Networking\BitWriter.cpp ..\src\Networking\BitReader.cpp ..\src\Networking\Packet.cpp ..\src\Networking\NetworkSocket.cpp ..\src\Networking\NetworkConnection.cpp ..\src\Networking\NetworkObject.cpp ..\src\Networking\NetworkReplication.cpp ..\src\Networking\ServerAntiCheat.cpp ..\src\Networking\ClientAntiCheat.cpp ..\src\Networking\NetworkServer.cpp ..\src\Networking\NetworkClient.cpp ..\src\Networking\MultiplayerManager.cpp ..\src\Scene\SceneNode.cpp ..\src\Scene\SceneGraph.cpp ..\src\Script\ScriptSystem.cpp ..\src\AI\NavMesh.cpp ..\src\AI\NavAgent.cpp ..\src\AI\NavigationSystem.cpp ..\src\VFX\ParticleEmitter.cpp ..\src\VFX\ParticleSystem.cpp ..\src\Terrain\TerrainSystem.cpp ..\src\PostProcess\PostProcessSystem.cpp ..\src\Asset\AssetRegistry.cpp ..\src\Prefab\Prefab.cpp ..\src\Prefab\PrefabSystem.cpp ..\src\Debug\Profiler.cpp ..\src\Debug\DebugConsole.cpp ..\src\Input\InputMapping.cpp
 
 for %%f in (%SOURCES%) do (
     if not exist %%f (
@@ -329,12 +329,12 @@ for %%f in (%SOURCES%) do (
 echo SOURCES: %SOURCES%
 :: Platform specific includes & libs
 if "%PLATFORM_TYPE%"=="EPIC" (
-    set PLATFORM_INC=/I..\ThirdParty\EOS-SDK-58105819-Release-v1.19.2.1\SDK\Include
-    set PLATFORM_LIB=..\ThirdParty\EOS-SDK-58105819-Release-v1.19.2.1\SDK\Lib\EOSSDK-Win64-Shipping.lib
+    set PLATFORM_INC=/I..\ThirdParty\EpicGames\EOS-SDK-58105819-Release-v1.19.2.1\SDK\Include
+    set PLATFORM_LIB=..\ThirdParty\EpicGames\EOS-SDK-58105819-Release-v1.19.2.1\SDK\Lib\EOSSDK-Win64-Shipping.lib
     set PLATFORM_DELAYLOAD=/DELAYLOAD:EOSSDK-Win64-Shipping.dll
  ) else if "%PLATFORM_TYPE%"=="STEAM" (
-    set PLATFORM_INC=/I..\ThirdParty\steamworks_sdk_165\sdk\public
-    set PLATFORM_LIB=..\ThirdParty\steamworks_sdk_165\sdk\redistributable_bin\win64\steam_api64.lib
+    set PLATFORM_INC=/I..\ThirdParty\Valve\steamworks_sdk_165\sdk\public
+    set PLATFORM_LIB=..\ThirdParty\Valve\steamworks_sdk_165\sdk\redistributable_bin\win64\steam_api64.lib
     set PLATFORM_DELAYLOAD=/DELAYLOAD:steam_api64.dll
 ) else (
     set PLATFORM_INC=
@@ -342,7 +342,7 @@ if "%PLATFORM_TYPE%"=="EPIC" (
     set PLATFORM_DELAYLOAD=
 )
 
-cl.exe /nologo /MP4 /bigobj /Zm300 /EHsc /W3 /utf-8 /DNDEBUG %MODE_DEFINE% /DWIN32_LEAN_AND_MEAN /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /MD /O2 /std:c++20 /DUNICODE /D_UNICODE /I.. /I..\src /I..\src\Core /I..\src\Renderer /I..\src\Input /I..\src\Audio /I..\src\Storage /I..\src\Sequencer /I..\ThirdParty\EngineDependencies /I..\ThirdParty\EngineDependencies\lua54\lua-5.4.7\src /I..\src\imgui /I..\ThirdParty\streamline-sdk-v2.14.1\include /I..\ThirdParty\AgilitySDK-1.619.6\build\native\include /I..\ThirdParty\DirectX-Headers\include /I..\ThirdParty\FidelityFX-SDK-v1.1.4\sdk\include\FidelityFX /I..\ThirdParty\FidelityFX-SDK-v1.1.4\sdk\include\FidelityFX\gpu /I..\ThirdParty\XeSS_SDK_3.0.2\inc /I..\ThirdParty\XeSS_SDK_3.0.2\inc\xess /I..\ThirdParty\XeSS_SDK_3.0.2\inc\xess_fg /I..\ThirdParty\XeSS_SDK_3.0.2\inc\xell /I..\ThirdParty\DirectStorage\sdk-package\native\include /I..\ThirdParty\PhysX\physx\include /I..\ThirdParty\WebView2\build\native\include /I..\ThirdParty\discord_social_sdk\include %PLATFORM_INC% /Fe"Idontknow.pending.exe" %SOURCES% ..\src\imgui\*.cpp d3d12.lib dxgi.lib user32.lib comdlg32.lib d3dcompiler.lib dxcompiler.lib bcrypt.lib wintrust.lib crypt32.lib hid.lib setupapi.lib cfgmgr32.lib xinput.lib ole32.lib advapi32.lib ws2_32.lib shlwapi.lib iphlpapi.lib ..\ThirdParty\WebView2\build\native\x64\WebView2LoaderStatic.lib ..\ThirdParty\streamline-sdk-v2.14.1\lib\x64\sl.interposer.lib ..\ThirdParty\XeSS_SDK_3.0.2\lib\libxess.lib ..\ThirdParty\XeSS_SDK_3.0.2\lib\libxess_fg.lib ..\ThirdParty\XeSS_SDK_3.0.2\lib\libxell.lib ..\ThirdParty\XeSS_SDK_3.0.2\lib\libxess_dx11.lib ..\ThirdParty\DirectStorage\sdk-package\native\lib\x64\dstorage.lib ..\ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysX.lib ..\ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXCommon.lib ..\ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXExtensions_static.lib ..\ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXVehicle_static.lib ..\ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXFoundation.lib ..\ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXPvdSDK_static.lib ..\ThirdParty\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXCharacterKinematic_static.lib ..\ThirdParty\discord_social_sdk\lib\release\discord_partner_sdk.lib %PLATFORM_LIB% /link /MANIFEST:EMBED /MANIFESTINPUT:..\src\Core\app.manifest /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT %PLATFORM_DELAYLOAD% /DELAYLOAD:sl.interposer.dll /DELAYLOAD:libxess.dll /DELAYLOAD:libxess_fg.dll /DELAYLOAD:libxell.dll /DELAYLOAD:libxess_dx11.dll /DELAYLOAD:dstorage.dll /DELAYLOAD:dstoragecore.dll /DELAYLOAD:dxcompiler.dll /DELAYLOAD:PhysX.dll /DELAYLOAD:PhysXCommon.dll /DELAYLOAD:PhysXFoundation.dll /DELAYLOAD:discord_partner_sdk.dll /ignore:4199 delayimp.lib > build_log.txt 2>&1
+cl.exe /nologo /MP4 /bigobj /Zm300 /EHsc /W3 /utf-8 /DNDEBUG %MODE_DEFINE% /DWIN32_LEAN_AND_MEAN /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /MD /O2 /std:c++20 /DUNICODE /D_UNICODE /I.. /I..\src /I..\src\Core /I..\src\Renderer /I..\src\Input /I..\src\Audio /I..\src\Storage /I..\src\Sequencer /I..\ThirdParty\Libraries\EngineDependencies /I..\ThirdParty\Libraries\EngineDependencies\lua54\lua-5.4.7\src /I..\src\imgui /I..\ThirdParty\NVIDIA\streamline-sdk-v2.14.1\include /I..\ThirdParty\Microsoft\AgilitySDK-1.619.6\build\native\include /I..\ThirdParty\Microsoft\DirectX-Headers\include /I..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\sdk\include\FidelityFX /I..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\sdk\include\FidelityFX\gpu /I..\ThirdParty\Intel\XeSS_SDK_3.0.2\inc /I..\ThirdParty\Intel\XeSS_SDK_3.0.2\inc\xess /I..\ThirdParty\Intel\XeSS_SDK_3.0.2\inc\xess_fg /I..\ThirdParty\Intel\XeSS_SDK_3.0.2\inc\xell /I..\ThirdParty\Microsoft\DirectStorage\sdk-package\native\include /I..\ThirdParty\NVIDIA\PhysX\physx\include /I..\ThirdParty\Microsoft\WebView2\build\native\include /I..\ThirdParty\Discord\discord_social_sdk\include %PLATFORM_INC% /Fe"Idontknow.pending.exe" %SOURCES% ..\src\imgui\*.cpp d3d12.lib dxgi.lib user32.lib comdlg32.lib d3dcompiler.lib dxcompiler.lib bcrypt.lib wintrust.lib crypt32.lib hid.lib setupapi.lib cfgmgr32.lib xinput.lib ole32.lib advapi32.lib ws2_32.lib shlwapi.lib iphlpapi.lib ..\ThirdParty\Microsoft\WebView2\build\native\x64\WebView2Loader.dll.lib ..\ThirdParty\NVIDIA\streamline-sdk-v2.14.1\lib\x64\sl.interposer.lib ..\ThirdParty\Intel\XeSS_SDK_3.0.2\lib\libxess.lib ..\ThirdParty\Intel\XeSS_SDK_3.0.2\lib\libxess_fg.lib ..\ThirdParty\Intel\XeSS_SDK_3.0.2\lib\libxell.lib ..\ThirdParty\Intel\XeSS_SDK_3.0.2\lib\libxess_dx11.lib ..\ThirdParty\Microsoft\DirectStorage\sdk-package\native\lib\x64\dstorage.lib ..\ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysX.lib ..\ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXCommon.lib ..\ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXExtensions_static.lib ..\ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXVehicle_static.lib ..\ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXFoundation.lib ..\ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXPvdSDK_static.lib ..\ThirdParty\NVIDIA\PhysX\Lib\bin\win.x86_64.vc143.md\release\PhysXCharacterKinematic_static.lib ..\ThirdParty\Discord\discord_social_sdk\lib\release\discord_partner_sdk.lib %PLATFORM_LIB% /link /MANIFEST:EMBED /MANIFESTINPUT:..\src\Core\app.manifest /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT %PLATFORM_DELAYLOAD% /DELAYLOAD:sl.interposer.dll /DELAYLOAD:libxess.dll /DELAYLOAD:libxess_fg.dll /DELAYLOAD:libxell.dll /DELAYLOAD:libxess_dx11.dll /DELAYLOAD:dstorage.dll /DELAYLOAD:dstoragecore.dll /DELAYLOAD:dxcompiler.dll /DELAYLOAD:WebView2Loader.dll /DELAYLOAD:PhysX.dll /DELAYLOAD:PhysXCommon.dll /DELAYLOAD:PhysXFoundation.dll /DELAYLOAD:discord_partner_sdk.dll /ignore:4199 delayimp.lib > build_log.txt 2>&1
 if errorlevel 1 (
     echo Compilation FAILED!
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Build\CleanBuildOutput.ps1" -BuildDirectory "%CD%"
@@ -362,44 +362,42 @@ if not exist ThirdParty mkdir ThirdParty
 
 :: Copy Discord Social SDK DLLs & Krisp assets
 if not exist ThirdParty\Discord mkdir ThirdParty\Discord
-if exist ..\ThirdParty\discord_social_sdk\bin\release (
-    copy /Y ..\ThirdParty\discord_social_sdk\bin\release\*.dll ThirdParty\Discord\ > nul 2>&1
-    copy /Y ..\ThirdParty\discord_social_sdk\bin\release\*.kef ThirdParty\Discord\ > nul 2>&1
+if exist ..\ThirdParty\Discord\discord_social_sdk\bin\release (
+    copy /Y ..\ThirdParty\Discord\discord_social_sdk\bin\release\*.dll ThirdParty\Discord\ > nul 2>&1
+    copy /Y ..\ThirdParty\Discord\discord_social_sdk\bin\release\*.kef ThirdParty\Discord\ > nul 2>&1
 )
 
 :: Copy FidelityFX FSR DLLs
-if exist ..\ThirdParty\FidelityFX-SDK-v1.1.4\bin (
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\bin\amd_*.dll ThirdParty\AMD\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\bin\D3D12\D3D12Core.dll ThirdParty\DirectX\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\bin\dxcompiler.dll ThirdParty\DirectX\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\bin\dxil.dll ThirdParty\DirectX\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\bin\WinPixEventRuntime.dll ThirdParty\DirectX\ > nul 2>&1
+if exist ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\bin (
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\bin\amd_*.dll ThirdParty\AMD\ > nul 2>&1
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\bin\dxcompiler.dll ThirdParty\Microsoft\DirectX\ > nul 2>&1
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\bin\dxil.dll ThirdParty\Microsoft\DirectX\ > nul 2>&1
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\bin\WinPixEventRuntime.dll ThirdParty\Microsoft\DirectX\ > nul 2>&1
 )
-if exist ..\ThirdParty\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL (
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\amd_*.dll ThirdParty\AMD\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\D3D12Core.dll ThirdParty\DirectX\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\dxcompiler.dll ThirdParty\DirectX\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\dxil.dll ThirdParty\DirectX\ > nul 2>&1
-    copy /Y ..\ThirdParty\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\WinPixEventRuntime.dll ThirdParty\DirectX\ > nul 2>&1
+if exist ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL (
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\amd_*.dll ThirdParty\AMD\ > nul 2>&1
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\dxcompiler.dll ThirdParty\Microsoft\DirectX\ > nul 2>&1
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\dxil.dll ThirdParty\Microsoft\DirectX\ > nul 2>&1
+    copy /Y ..\ThirdParty\AMD\FidelityFX-SDK-v1.1.4\PrebuiltSignedDLL\WinPixEventRuntime.dll ThirdParty\Microsoft\DirectX\ > nul 2>&1
 )
 if exist ThirdParty\AMD\amd_fidelityfx_vk.dll del /Q ThirdParty\AMD\amd_fidelityfx_vk.dll > nul 2>&1
 
 :: Copy Streamline SDK Release DLLs
-if exist ..\ThirdParty\streamline-sdk-v2.14.1\bin\x64 copy /Y ..\ThirdParty\streamline-sdk-v2.14.1\bin\x64\*.dll ThirdParty\NVIDIA\Streamline\ > nul 2>&1
+if exist ..\ThirdParty\NVIDIA\streamline-sdk-v2.14.1\bin\x64 copy /Y ..\ThirdParty\NVIDIA\streamline-sdk-v2.14.1\bin\x64\*.dll ThirdParty\NVIDIA\Streamline\ > nul 2>&1
 if exist ThirdParty\NVIDIA\Streamline\WinPixEventRuntime.dll (
-    copy /Y ThirdParty\NVIDIA\Streamline\WinPixEventRuntime.dll ThirdParty\DirectX\ > nul 2>&1
+    copy /Y ThirdParty\NVIDIA\Streamline\WinPixEventRuntime.dll ThirdParty\Microsoft\DirectX\ > nul 2>&1
     del /Q ThirdParty\NVIDIA\Streamline\WinPixEventRuntime.dll > nul 2>&1
 )
 
 :: Copy Intel XeSS DLLs into ThirdParty\Intel\ only
 if not exist ThirdParty\Intel mkdir ThirdParty\Intel
-if exist ..\ThirdParty\XeSS_SDK_3.0.2\bin copy /Y ..\ThirdParty\XeSS_SDK_3.0.2\bin\*.dll ThirdParty\Intel\ > nul 2>&1
+if exist ..\ThirdParty\Intel\XeSS_SDK_3.0.2\bin copy /Y ..\ThirdParty\Intel\XeSS_SDK_3.0.2\bin\*.dll ThirdParty\Intel\ > nul 2>&1
 if exist libxess*.dll del /Q libxess*.dll > nul 2>&1
 if exist libxell.dll del /Q libxell.dll > nul 2>&1
 
-:: Copy DirectStorage DLLs into ThirdParty\DirectStorage\ only
-if not exist ThirdParty\DirectStorage mkdir ThirdParty\DirectStorage
-if exist ..\ThirdParty\DirectStorage\sdk-package\native\bin\x64 copy /Y ..\ThirdParty\DirectStorage\sdk-package\native\bin\x64\*.dll ThirdParty\DirectStorage\ > nul 2>&1
+:: Copy DirectStorage DLLs into ThirdParty\Microsoft\DirectStorage\ only
+if not exist ThirdParty\Microsoft\DirectStorage mkdir ThirdParty\Microsoft\DirectStorage
+if exist ..\ThirdParty\Microsoft\DirectStorage\sdk-package\native\bin\x64 copy /Y ..\ThirdParty\Microsoft\DirectStorage\sdk-package\native\bin\x64\*.dll ThirdParty\Microsoft\DirectStorage\ > nul 2>&1
 if exist dstorage*.dll del /Q dstorage*.dll > nul 2>&1
 
 :: Embed cryptographic DLL integrity manifest into content archive (Contents\content01.pak)
@@ -490,7 +488,7 @@ if errorlevel 1 (
 )
 
 if not exist ThirdParty\Microsoft\MsQuic mkdir ThirdParty\Microsoft\MsQuic
-copy /Y ..\ThirdParty\MsQuic-2.6.1-OpenSSL\build\native\bin\x64\msquic.dll ThirdParty\Microsoft\MsQuic\ > nul
+copy /Y ..\ThirdParty\Microsoft\MsQuic-2.6.1-OpenSSL\build\native\bin\x64\msquic.dll ThirdParty\Microsoft\MsQuic\ > nul
 if errorlevel 1 exit /b 1
 
 :: Copy default server.cfg and map .pak files into server root
@@ -538,8 +536,8 @@ for %%f in (%SERVER_SOURCES%) do (
 echo SERVER SOURCES: %SERVER_SOURCES%
 if exist IdontknowServer del /Q IdontknowServer > nul 2>&1
 
-set ZIG_EXE=..\ThirdParty\zig\zig-windows-x86_64-0.13.0\zig.exe
-if not exist %ZIG_EXE% set ZIG_EXE=..\ThirdParty\zig\zig.exe
+set ZIG_EXE=..\ThirdParty\OpenSource\zig\zig-windows-x86_64-0.13.0\zig.exe
+if not exist %ZIG_EXE% set ZIG_EXE=..\ThirdParty\OpenSource\zig\zig.exe
 
 if not exist %ZIG_EXE% (
     where wsl >nul 2>&1
@@ -555,13 +553,13 @@ if not exist %ZIG_EXE% (
 )
 
 if not exist %ZIG_EXE% (
-    echo [Notice] Downloading lightweight Linux cross-compiler to ThirdParty\zig...
-    if not exist ..\ThirdParty\zig mkdir ..\ThirdParty\zig
-    curl.exe -L -o "..\ThirdParty\zig\zig.zip" "https://zig.linus.dev/zig/zig-windows-x86_64-0.13.0.zip"
-    if exist ..\ThirdParty\zig\zig.zip (
-        tar.exe -xf ..\ThirdParty\zig\zig.zip -C ..\ThirdParty\zig\
-        del /Q ..\ThirdParty\zig\zig.zip >nul 2>&1
-        set ZIG_EXE=..\ThirdParty\zig\zig-windows-x86_64-0.13.0\zig.exe
+    echo [Notice] Downloading lightweight Linux cross-compiler to ThirdParty\OpenSource\zig...
+    if not exist ..\ThirdParty\OpenSource\zig mkdir ..\ThirdParty\OpenSource\zig
+    curl.exe -L -o "..\ThirdParty\OpenSource\zig\zig.zip" "https://zig.linus.dev/zig/zig-windows-x86_64-0.13.0.zip"
+    if exist ..\ThirdParty\OpenSource\zig\zig.zip (
+        tar.exe -xf ..\ThirdParty\OpenSource\zig\zig.zip -C ..\ThirdParty\OpenSource\zig\
+        del /Q ..\ThirdParty\OpenSource\zig\zig.zip >nul 2>&1
+        set ZIG_EXE=..\ThirdParty\OpenSource\zig\zig-windows-x86_64-0.13.0\zig.exe
     )
 )
 
@@ -638,17 +636,17 @@ if exist Idontknow.app\Contents\Resources\shaders rmdir /S /Q Idontknow.app\Cont
 if exist Idontknow.app\Contents\Resources\*.pak del /Q Idontknow.app\Contents\Resources\*.pak > nul 2>&1
 
 :: Locate Zig Toolchain
-set ZIG_EXE=..\ThirdParty\zig\zig-windows-x86_64-0.13.0\zig.exe
-if not exist %ZIG_EXE% set ZIG_EXE=..\ThirdParty\zig\zig.exe
+set ZIG_EXE=..\ThirdParty\OpenSource\zig\zig-windows-x86_64-0.13.0\zig.exe
+if not exist %ZIG_EXE% set ZIG_EXE=..\ThirdParty\OpenSource\zig\zig.exe
 
 if not exist %ZIG_EXE% (
-    echo [Notice] Downloading lightweight Zig cross-compiler to ThirdParty\zig...
-    if not exist ..\ThirdParty\zig mkdir ..\ThirdParty\zig
-    curl.exe -L -o "..\ThirdParty\zig\zig.zip" "https://zig.linus.dev/zig/zig-windows-x86_64-0.13.0.zip"
-    if exist ..\ThirdParty\zig\zig.zip (
-        tar.exe -xf ..\ThirdParty\zig\zig.zip -C ..\ThirdParty\zig\
-        del /Q ..\ThirdParty\zig\zig.zip >nul 2>&1
-        set ZIG_EXE=..\ThirdParty\zig\zig-windows-x86_64-0.13.0\zig.exe
+    echo [Notice] Downloading lightweight Zig cross-compiler to ThirdParty\OpenSource\zig...
+    if not exist ..\ThirdParty\OpenSource\zig mkdir ..\ThirdParty\OpenSource\zig
+    curl.exe -L -o "..\ThirdParty\OpenSource\zig\zig.zip" "https://zig.linus.dev/zig/zig-windows-x86_64-0.13.0.zip"
+    if exist ..\ThirdParty\OpenSource\zig\zig.zip (
+        tar.exe -xf ..\ThirdParty\OpenSource\zig\zig.zip -C ..\ThirdParty\OpenSource\zig\
+        del /Q ..\ThirdParty\OpenSource\zig\zig.zip >nul 2>&1
+        set ZIG_EXE=..\ThirdParty\OpenSource\zig\zig-windows-x86_64-0.13.0\zig.exe
     )
 )
 
@@ -700,7 +698,7 @@ if exist Idontknow.app\Contents\Resources\*.pak del /Q Idontknow.app\Contents\Re
 
 :: Step 1: Compile ufbx.c with Zig C compiler
 echo [1/2] Compiling ufbx FBX runtime...
-%ZIG_EXE% cc -target aarch64-macos.13.0-none -isysroot %SDK_PATH% -O2 -c ..\ThirdParty\EngineDependencies\ufbx.c -o obj\ufbx.o
+%ZIG_EXE% cc -target aarch64-macos.13.0-none -isysroot %SDK_PATH% -O2 -c ..\ThirdParty\Libraries\EngineDependencies\ufbx.c -o obj\ufbx.o
 if errorlevel 1 (
     echo ERROR: Compiling ufbx.c failed!
     cd /D d:\MyEngine
@@ -708,13 +706,13 @@ if errorlevel 1 (
 )
 
 :: Step 2: Compile & Link macOS Apple Silicon binary with Zig C++ compiler (Release, Clean Game without ImGui)
-%ZIG_EXE% cc -target aarch64-macos.13.0-none -isysroot %SDK_PATH% -O2 -c ..\ThirdParty\EngineDependencies\lua54\lua-5.4.7\src\onelua.c -o obj\lua.o
+%ZIG_EXE% cc -target aarch64-macos.13.0-none -isysroot %SDK_PATH% -O2 -c ..\ThirdParty\Libraries\EngineDependencies\lua54\lua-5.4.7\src\onelua.c -o obj\lua.o
 if errorlevel 1 exit /b 1
 echo [2/2] Compiling and Linking native Apple Silicon Mach-O binary (Release - Metal + MetalFX)...
 
 set MACOS_SOURCES=..\src\Core\main.cpp ..\src\Core\Application.cpp ..\src\Core\Window.cpp ..\src\Upscaling\XeSS\XeSSSystem.cpp ..\src\Storage\DirectStorage\DirectStorageSystem.cpp ..\src\Platform\PlatformUtils.cpp ..\src\Storage\PakCompression.cpp ..\src\Renderer\ModelLoader.cpp ..\src\Renderer\Camera.cpp ..\src\Renderer\CameraSystem.cpp ..\src\Core\Timer.cpp ..\src\Renderer\TextureStreamer.cpp ..\src\Renderer\Texture.cpp ..\src\Sequencer\Sequencer.cpp ..\src\Security\SecuritySystem.cpp ..\src\Security\MBAObfuscator.cpp ..\src\Security\VirtualMachine.cpp ..\src\Security\HardwareID.cpp ..\src\Security\LicenseSystem.cpp ..\src\Rain\RainSystem.cpp ..\src\Rain\WeatherSystem.cpp ..\src\Physics\PhysicsSystem.cpp ..\src\Physics\ClothSystem.cpp ..\src\Physics\HairSystem.cpp ..\src\Physics\CharacterController.cpp ..\src\UI\WebMenuSystem.cpp ..\src\UI\ContentBrowser.cpp ..\src\Level\LevelSystem.cpp ..\src\Storage\SaveSystem.cpp ..\src\Steam\SteamSystem.cpp ..\src\Epic\EpicSystem.cpp ..\src\Discord\DiscordSystem.cpp ..\src\Animation\SkinnedMesh.cpp ..\src\Animation\CharacterAsset.cpp ..\src\Animation\AnimationSystem.cpp ..\src\Animation\BoneClassifierAI.cpp ..\src\Animation\BoneMappingWindow.cpp ..\src\Animation\Ozz\OzzRuntime.cpp ..\src\Animation\Ozz\OzzSerializer.cpp ..\src\Animation\Ozz\OzzImporter.cpp ..\src\Animation\MotionMatching\MotionDatabase.cpp ..\src\Animation\MotionMatching\MotionTrajectory.cpp ..\src\Animation\MotionMatching\MotionMatcher.cpp ..\src\Animation\MotionMatching\MotionController.cpp ..\src\Input\DualSense.cpp ..\src\Input\DualShock.cpp ..\src\Audio\DualSenseAudio.cpp ..\src\Audio\AudioSystem.cpp ..\src\Networking\BitWriter.cpp ..\src\Networking\BitReader.cpp ..\src\Networking\Packet.cpp ..\src\Networking\NetworkSocket.cpp ..\src\Networking\NetworkConnection.cpp ..\src\Networking\NetworkObject.cpp ..\src\Networking\NetworkReplication.cpp ..\src\Networking\ServerAntiCheat.cpp ..\src\Networking\ClientAntiCheat.cpp ..\src\Networking\NetworkServer.cpp ..\src\Networking\NetworkClient.cpp ..\src\Networking\MultiplayerManager.cpp ..\src\Scene\SceneNode.cpp ..\src\Scene\SceneGraph.cpp ..\src\Script\ScriptSystem.cpp ..\src\AI\NavMesh.cpp ..\src\AI\NavAgent.cpp ..\src\AI\NavigationSystem.cpp ..\src\VFX\ParticleEmitter.cpp ..\src\VFX\ParticleSystem.cpp ..\src\Terrain\TerrainSystem.cpp ..\src\PostProcess\PostProcessSystem.cpp ..\src\Asset\AssetRegistry.cpp ..\src\Prefab\Prefab.cpp ..\src\Prefab\PrefabSystem.cpp ..\src\Debug\Profiler.cpp ..\src\Debug\DebugConsole.cpp ..\src\Input\InputMapping.cpp ..\src\Platform\macOS\MacWindow.mm ..\src\Renderer\Metal\Renderer_macOS.mm ..\src\Renderer\Metal\MetalRendererBackend.mm ..\src\Renderer\Metal\MetalDevice.mm ..\src\Renderer\Metal\MetalBuffer.mm ..\src\Renderer\Metal\MetalTexture.mm ..\src\Renderer\Metal\MetalPipeline.mm ..\src\Upscaling\MetalFX\MetalFXSystem.mm ..\src\RayTracing\Metal\MetalRayTracing.mm obj\ufbx.o obj\lua.o
 
-%ZIG_EXE% c++ -target aarch64-macos.13.0-none -isysroot %SDK_PATH% -isystem %SDK_PATH%\usr\include -F %SDK_PATH%\System\Library\Frameworks -L %SDK_PATH%\usr\lib -framework Cocoa -framework Metal -framework MetalKit -framework MetalFX -framework QuartzCore -framework Foundation -framework CoreGraphics -framework IOKit -framework GameController -framework AudioToolbox -lobjc -fobjc-arc -Wno-deprecated-declarations -Wno-availability -Wno-elaborated-enum-base -O2 -std=c++20 -DMYENGINE_MACOS=1 -D_MYENGINE_MACOS=1 -DENGINE_RELEASE=1 -I..\src -I..\src\Core -I..\src\Renderer -I..\src\Input -I..\src\Audio -I..\src\Storage -I..\src\Sequencer -I..\ThirdParty\EngineDependencies -I..\src\Platform\WindowsCompat -I..\src\imgui -I..\src\Platform\DirectXMath -I..\ThirdParty\PhysX\physx\include -I..\ThirdParty\steamworks_sdk_165\sdk\public -I..\ThirdParty\discord_social_sdk\include %MACOS_SOURCES% -o Idontknow.app\Contents\MacOS\Idontknow > build_log.txt 2>&1
+%ZIG_EXE% c++ -target aarch64-macos.13.0-none -isysroot %SDK_PATH% -isystem %SDK_PATH%\usr\include -F %SDK_PATH%\System\Library\Frameworks -L %SDK_PATH%\usr\lib -framework Cocoa -framework Metal -framework MetalKit -framework MetalFX -framework QuartzCore -framework Foundation -framework CoreGraphics -framework IOKit -framework GameController -framework AudioToolbox -lobjc -fobjc-arc -Wno-deprecated-declarations -Wno-availability -Wno-elaborated-enum-base -O2 -std=c++20 -DMYENGINE_MACOS=1 -D_MYENGINE_MACOS=1 -DENGINE_RELEASE=1 -I..\src -I..\src\Core -I..\src\Renderer -I..\src\Input -I..\src\Audio -I..\src\Storage -I..\src\Sequencer -I..\ThirdParty\Libraries\EngineDependencies -I..\src\Platform\WindowsCompat -I..\src\imgui -I..\src\Platform\DirectXMath -I..\ThirdParty\NVIDIA\PhysX\physx\include -I..\ThirdParty\Valve\steamworks_sdk_165\sdk\public -I..\ThirdParty\Discord\discord_social_sdk\include %MACOS_SOURCES% -o Idontknow.app\Contents\MacOS\Idontknow > build_log.txt 2>&1
 
 if errorlevel 1 (
     echo macOS Client Compilation FAILED!

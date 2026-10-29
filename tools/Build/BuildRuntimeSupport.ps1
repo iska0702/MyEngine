@@ -9,7 +9,7 @@ if(!(Test-Path -LiteralPath $editor)-or !(Test-Path -LiteralPath $cooker)){throw
 $stage=Join-Path $root '.ProjectBuild'
 $previousInternal=$env:IDK_INTERNAL_PROJECT_BUILD;$previousContent=$env:IDK_PROJECT_CONTENT;$previousRuntime=$env:IDK_RUNTIME_ROOT;$previousSteam=$env:MYENGINE_ENABLE_STEAM
 try{
-    $env:IDK_INTERNAL_PROJECT_BUILD='1';$env:IDK_PROJECT_CONTENT=$null;$env:IDK_RUNTIME_ROOT=$null
+    $env:IDK_INTERNAL_PROJECT_BUILD='1';$env:IDK_PROJECT_CONTENT=$previousContent;$env:IDK_RUNTIME_ROOT=$null
     foreach($platform in $Platforms){
         if($platform-eq "steam"){$env:MYENGINE_ENABLE_STEAM="1"}
         if($platform-eq 'standalone'-and $StandaloneBuild){$source=(Resolve-Path -LiteralPath $StandaloneBuild).Path}

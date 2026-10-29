@@ -1,12 +1,12 @@
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path (Split-Path $PSScriptRoot -Parent) '..'))
 $directory=Join-Path $root ('Diagnostics/StreamingSecurity-'+[guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path "$directory/Contents","$directory/ThirdParty/DirectStorage" | Out-Null
+New-Item -ItemType Directory -Force -Path "$directory/Contents","$directory/ThirdParty/Microsoft/DirectStorage" | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'Projects/Test/Build/Contents/content10.pak') -Destination "$directory/Contents/content10.pak"
-Copy-Item -Path (Join-Path $root 'Projects/Test/Build/ThirdParty/DirectStorage/*') -Destination "$directory/ThirdParty/DirectStorage"
+Copy-Item -Path (Join-Path $root 'Projects/Test/Build/ThirdParty/Microsoft/DirectStorage/*') -Destination "$directory/ThirdParty/Microsoft/DirectStorage"
 $build=[IO.File]::ReadAllText((Join-Path $root 'build.bat'))
 $start=$build.IndexOf(':: Check if vcvarsall.bat exists');$end=$build.IndexOf(':: Determine Build Target');$bootstrap=$build.Substring($start,$end-$start)
-$sdk=Join-Path $root 'ThirdParty/DirectStorage/sdk-package/native'
+$sdk=Join-Path $root 'ThirdParty/Microsoft/DirectStorage/sdk-package/native'
 $batch=Join-Path $directory 'compile.bat'
 $commands=@"
 @echo off

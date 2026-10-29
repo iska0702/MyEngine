@@ -18,7 +18,7 @@
 #include <wrl/client.h>
 #include <shlwapi.h>
 #include <shlobj.h>
-#include "../../ThirdParty/WebView2/build/native/include/WebView2.h"
+#include "../../ThirdParty/Microsoft/WebView2/build/native/include/WebView2.h"
 using namespace Microsoft::WRL;
 static EventRegistrationToken s_webMessageToken = {};
 #endif

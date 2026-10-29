@@ -189,6 +189,9 @@ void Renderer::WriteTechnologyState(const std::string& path){
     state<<"render_backend mesh "<<m_meshShadersAvailable<<" dxr_capability "<<m_dxrAvailable<<" mesh_dispatches "<<m_meshDispatches<<" vertex_draws "<<m_vertexDraws<<" compute_dispatches "<<m_computeDispatches<<" depth_mips "<<m_depthPyramidDispatches<<'\n';
     state<<"pipeline_cache hits "<<m_pipelineCache.hits<<" misses "<<m_pipelineCache.misses<<" failed "<<m_pipelineCache.failed<<'\n';
     state<<"gpu_pass_ms";for(auto value:m_gpuPassTimes)state<<' '<<value;state<<'\n';
+#if defined(ENGINE_EDITOR)
+    state<<"editor_texture_cache entries "<<m_textureCache.size()<<" previews "<<m_editorPreviewTextures.size()<<'\n';
+#endif
     state<<"upscaler_status dlss_supported "<<m_dlssSupported<<" fsr_temporal_active "<<m_fsrActive<<" xess_supported "<<m_xessSupported<<" dlss_fg_hardware "<<m_dlssGSupported<<" virtual_texturing_integrated "<<IsVirtualTexturingIntegrated()<<" frame_generation_integrated "<<IsFrameGenerationIntegrated()<<" ray_reconstruction_integrated "<<IsRayReconstructionIntegrated()<<'\n';
     state<<"fsr_provider "<<(m_fidelityFX?m_fidelityFX->Provider():"unavailable")<<'\n';
     state<<"fsr_frame_generation enabled "<<m_fsrFrameGenEnabled<<" active "<<m_fsrFrameGenActive<<" generated "<<(m_fidelityFXFrameGeneration?m_fidelityFXFrameGeneration->GeneratedFrames():0)<<'\n';

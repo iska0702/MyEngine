@@ -1,6 +1,6 @@
 # Steamworks SDK 1.65
 
-Windows Editor and Release builds use `ThirdParty/steamworks_sdk_165/sdk` by default.
+Windows Editor and Release builds use `ThirdParty/Valve/steamworks_sdk_165/sdk` by default.
 
 ```powershell
 ./build.bat editor steam

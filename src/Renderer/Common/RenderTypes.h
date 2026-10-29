@@ -328,6 +328,7 @@ struct SceneConstantBuffer {
     float    padLights2;
     PointLightData pointLights[MAX_POINT_LIGHTS];
     SpotLightData  spotLights[MAX_SPOT_LIGHTS];
+    XMMATRIX previousModel;
 };
 
 struct RaytracingConstants {

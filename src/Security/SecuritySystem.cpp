@@ -658,12 +658,32 @@ bool SecuritySystem::CheckCodeIntegrity(SecurityReport& report) {
         }
     }
 
-    // 2. Scan entry point of the code section for software debugger breakpoints (INT3 0xCC)
-    const uint8_t* pCode = (const uint8_t*)m_codeSectionBase;
-    for (size_t i = 0; i < 64 && i < m_codeSectionSize; ++i) {
-        if (pCode[i] == 0xCC) {
-            report.violations.push_back("Software Breakpoint (INT3) Detected in Executable Entry");
-            return false;
+    // Inspect the actual PE entry point, not the start of .text: MSVC commonly
+    // fills alignment gaps with INT3. Compare against the file to distinguish
+    // an intentional byte in the executable from an in-memory breakpoint.
+    const auto module = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    const auto dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(module);
+    if (module && dos->e_magic == IMAGE_DOS_SIGNATURE && dos->e_lfanew > 0) {
+        const auto nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(module + dos->e_lfanew);
+        const auto entryRva = nt->OptionalHeader.AddressOfEntryPoint;
+        const auto entry = reinterpret_cast<uintptr_t>(module) + entryRva;
+        if (nt->Signature == IMAGE_NT_SIGNATURE && entry >= m_codeSectionBase &&
+            entry - m_codeSectionBase < m_codeSectionSize && *reinterpret_cast<const uint8_t*>(entry) == 0xCC) {
+            const auto sections = IMAGE_FIRST_SECTION(nt);
+            for (unsigned i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
+                const auto& section = sections[i];
+                if (entryRva < section.VirtualAddress || entryRva - section.VirtualAddress >= section.SizeOfRawData) continue;
+                wchar_t path[32768]{};
+                if (!GetModuleFileNameW(nullptr, path, static_cast<DWORD>(std::size(path)))) break;
+                std::ifstream executable(std::filesystem::path(path), std::ios::binary);
+                executable.seekg(static_cast<std::streamoff>(section.PointerToRawData) + entryRva - section.VirtualAddress);
+                char original = 0;
+                if (executable.read(&original, 1) && static_cast<uint8_t>(original) != 0xCC) {
+                    report.violations.push_back("Software Breakpoint (INT3) Detected in Executable Entry");
+                    return false;
+                }
+                break;
+            }
         }
     }
 

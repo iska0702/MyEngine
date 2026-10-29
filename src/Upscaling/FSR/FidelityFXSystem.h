@@ -5,9 +5,9 @@
 #include <filesystem>
 #include <string>
 #include "Core/EngineLog.h"
-#include "../../../ThirdParty/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_api_loader.h"
-#include "../../../ThirdParty/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_upscale.h"
-#include "../../../ThirdParty/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/dx12/ffx_api_dx12.h"
+#include "../../../ThirdParty/AMD/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_api_loader.h"
+#include "../../../ThirdParty/AMD/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_upscale.h"
+#include "../../../ThirdParty/AMD/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/dx12/ffx_api_dx12.h"
 namespace EngineRender {
 class FidelityFXSystem {
     HMODULE module=nullptr;

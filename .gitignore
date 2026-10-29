@@ -33,10 +33,9 @@
 
 # SDKs are installed locally; small source dependencies remain in Git
 /ThirdParty/*
-!/ThirdParty/EngineDependencies/
-!/ThirdParty/miniz/
-/ThirdParty/EngineDependencies/**/*.exe
-/ThirdParty/EngineDependencies/**/*.dll
+!/ThirdParty/Libraries/
+/ThirdParty/Libraries/EngineDependencies/**/*.exe
+/ThirdParty/Libraries/EngineDependencies/**/*.dll
 
 # Compilers and generated build products
 /tools/zig/

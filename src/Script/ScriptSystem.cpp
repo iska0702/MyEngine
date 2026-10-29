@@ -3,9 +3,9 @@
 
 // Lua 5.4.7 headers (source compiled separately as lua54_embed.c in build.bat)
 extern "C" {
-#include "../../ThirdParty/EngineDependencies/lua54/lua-5.4.7/src/lua.h"
-#include "../../ThirdParty/EngineDependencies/lua54/lua-5.4.7/src/lualib.h"
-#include "../../ThirdParty/EngineDependencies/lua54/lua-5.4.7/src/lauxlib.h"
+#include "../../ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src/lua.h"
+#include "../../ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src/lualib.h"
+#include "../../ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src/lauxlib.h"
 }
 
 #include <iostream>

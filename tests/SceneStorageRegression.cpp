@@ -1,7 +1,7 @@
 #include "Scene/SceneGraph.h"
 #include "Storage/SaveSystem.h"
 #include "Storage/ContentFile.h"
-#include "ThirdParty/EngineDependencies/miniaudio.h"
+#include "ThirdParty/Libraries/EngineDependencies/miniaudio.h"
 #include <iostream>
 #include <stdexcept>
 #include <chrono>

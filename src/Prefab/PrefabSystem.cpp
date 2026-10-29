@@ -1,5 +1,6 @@
 #include "PrefabSystem.h"
 #include "Asset/AssetRegistry.h"
+#include "Asset/MaterialAsset.h"
 #include "Platform/PlatformUtils.h"
 #include "Renderer.h"
 #include <filesystem>
@@ -283,6 +284,8 @@ void PrefabSystem::ExtractNodeData(EngineScene::SceneNode* node, PrefabNodeData&
             auto& models = renderer->GetModels();
             for (const auto& m : models) {
                 if (m.modelId == meshComp->modelId || m.name == meshComp->modelName) {
+                    outData.properties["model_settings"] = EngineAsset::EncodeModelAsset(m);
+                    if (!m.geometryName.empty()) outData.meshType = m.geometryName;
                     outData.diffuseColor = XMFLOAT4(m.material.albedo.x, m.material.albedo.y, m.material.albedo.z, 1.0f);
                     outData.roughness = m.material.roughness;
                     outData.metallic = m.material.metallic;
@@ -369,7 +372,8 @@ std::shared_ptr<Prefab> PrefabSystem::CreatePrefabFromNode(
 std::shared_ptr<EngineScene::SceneNode> PrefabSystem::BuildNodeHierarchy(
     const PrefabNodeData& data,
     std::shared_ptr<EngineScene::SceneNode> parent,
-    Renderer* renderer
+    Renderer* renderer,
+    const std::string& prefabName
 ) {
     auto node = EngineScene::SceneGraph::Get().CreateNode(data.name, parent);
     if (!node) return nullptr;
@@ -378,6 +382,7 @@ std::shared_ptr<EngineScene::SceneNode> PrefabSystem::BuildNodeHierarchy(
     node->GetTransform().localPosition = data.localPosition;
     node->GetTransform().localRotation = data.localRotation;
     node->GetTransform().localScale = data.localScale;
+    node->GetTransform().Update(parent ? XMLoadFloat4x4(&parent->GetTransform().worldMatrix) : XMMatrixIdentity());
 
     // Spawn Mesh if needed
     if (data.hasMesh && renderer) {
@@ -399,7 +404,11 @@ std::shared_ptr<EngineScene::SceneNode> PrefabSystem::BuildNodeHierarchy(
             m.material.roughness = data.roughness;
             m.material.metallic = data.metallic;
             m.material.emission = data.emissiveIntensity;
-            m.scale = data.localScale;
+            const auto settings = data.properties.find("model_settings");
+            if (settings != data.properties.end() && !EngineAsset::DecodeModelAsset(settings->second, m, renderer))
+                std::cerr << "[PrefabSystem] Invalid model settings for " << data.name << std::endl;
+            m.prefabSource = prefabName;
+            EngineScene::Transform::Decompose(XMLoadFloat4x4(&node->GetTransform().worldMatrix), m.position, m.rotation, m.scale);
 
             node->AddComponent<EngineScene::MeshComponent>(m.modelId, false, m.name);
         }
@@ -449,7 +458,7 @@ std::shared_ptr<EngineScene::SceneNode> PrefabSystem::BuildNodeHierarchy(
 
     // Recursively build children
     for (const auto& childData : data.children) {
-        BuildNodeHierarchy(childData, node, renderer);
+        BuildNodeHierarchy(childData, node, renderer, prefabName);
     }
 
     return node;
@@ -479,14 +488,12 @@ std::shared_ptr<EngineScene::SceneNode> PrefabSystem::InstantiateWithRenderer(
         return nullptr;
     }
 
-    const auto& rootData = prefab->GetRootData();
-    auto rootNode = BuildNodeHierarchy(rootData, parent, renderer);
+    auto rootData = prefab->GetRootData();
+    rootData.localPosition = worldPos;
+    rootData.localRotation = worldRot;
+    rootData.localScale = {rootData.localScale.x * worldScale.x, rootData.localScale.y * worldScale.y, rootData.localScale.z * worldScale.z};
+    auto rootNode = BuildNodeHierarchy(rootData, parent, renderer, prefabName);
     if (!rootNode) return nullptr;
-
-    // Apply instance transform overrides
-    rootNode->GetTransform().localPosition = worldPos;
-    rootNode->GetTransform().localRotation = worldRot;
-    rootNode->GetTransform().localScale = worldScale;
 
     std::cout << "[PrefabSystem] Instantiated prefab '" << prefabName << "' at ("
               << worldPos.x << ", " << worldPos.y << ", " << worldPos.z << ")" << std::endl;

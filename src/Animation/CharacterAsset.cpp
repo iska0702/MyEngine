@@ -2,7 +2,7 @@
 #include "CharacterAsset.h"
 #include "Ozz/OzzImporter.h"
 #include "Ozz/OzzSerializer.h"
-#include "ThirdParty/ufbx.h"
+#include "ThirdParty/Libraries/ufbx.h"
 #include "Platform/PlatformUtils.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Camera.h"

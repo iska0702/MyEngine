@@ -9,7 +9,7 @@ static void Check(bool value,const char* text){if(!value)throw std::runtime_erro
 int wmain(){try{
     SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     wchar_t exe[32768]{};GetModuleFileNameW(nullptr,exe,32768);
-    const auto root=std::filesystem::path(exe).parent_path();const auto runtime=root/L"ThirdParty/DirectStorage";
+    const auto root=std::filesystem::path(exe).parent_path();const auto runtime=root/L"ThirdParty/Microsoft/DirectStorage";
     auto cookie=AddDllDirectory(runtime.c_str());Check(cookie!=nullptr,"DLL directory unavailable");
     ComPtr<ID3D12Device> device;Check(SUCCEEDED(D3D12CreateDevice(nullptr,D3D_FEATURE_LEVEL_12_0,IID_PPV_ARGS(&device))),"D3D12 device failed");
     EngineStorage::DirectStorageSystem storage;Check(storage.Initialize(device.Get()),"DirectStorage initialization failed");

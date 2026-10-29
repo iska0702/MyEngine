@@ -25,26 +25,7 @@ bool PostProcessSystem::Initialize() {
     if (m_initialized) return true;
     m_initialized = true;
 
-    // Create a demo local horror volume placed in the scene
-    PostProcessVolume cryptVolume;
-    cryptVolume.name = "Dark Crypt Volume";
-    cryptVolume.center = XMFLOAT3(-15.0f, 0.0f, -15.0f);
-    cryptVolume.extents = XMFLOAT3(12.0f, 8.0f, 12.0f);
-    cryptVolume.blendDistance = 4.0f;
-    cryptVolume.priority = 2.0f;
-
-    // Horror settings for crypt
-    cryptVolume.settings.exposure = 0.65f;
-    cryptVolume.settings.tonemapper = TonemapOperator::Reinhard;
-    cryptVolume.settings.contrast = 1.3f;
-    cryptVolume.settings.saturation = 0.45f;
-    cryptVolume.settings.colorTemperature = -0.4f;
-    cryptVolume.settings.tint = -0.2f;
-    cryptVolume.settings.vignetteIntensity = 0.65f;
-    cryptVolume.settings.filmGrainIntensity = 0.10f;
-    cryptVolume.settings.chromaticAberration = 0.007f;
-
-    AddVolume(cryptVolume);
+    // Volumes come from the project scene or editor, not from startup demos.
     return true;
 }
 

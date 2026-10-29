@@ -4,11 +4,11 @@
 
 namespace EngineUI {
 inline bool ApplyAntiAliasing(Renderer& renderer, int mode) {
-    if (mode < 0 || mode > 3 || (mode == 2 && !renderer.IsDLSSSupported()) ||
-        (mode == 3 && !renderer.IsXeSSSupported())) return false;
+    if (mode < 0 || mode > 4 || (mode == 2 && !renderer.IsDLSSSupported()) ||
+        (mode == 3 && !renderer.IsXeSSSupported()) || (mode == 4 && !renderer.IsFSRSupported())) return false;
     renderer.SetTAAEnabled(mode == 1);
     renderer.SetUpscaleTechnique(mode == 2 ? UpscaleTechnique::DLSS :
-        mode == 3 ? UpscaleTechnique::XeSS : UpscaleTechnique::None);
+        mode == 3 ? UpscaleTechnique::XeSS : mode == 4 ? UpscaleTechnique::FSR : UpscaleTechnique::None);
     if (mode >= 2) renderer.SetUpscaleQuality(UpscaleQuality::Native);
     return true;
 }
@@ -121,28 +121,25 @@ inline void DrawAntiAliasingControls(Renderer& renderer) {
         selected = 2; preview = "NVIDIA DLAA (native resolution)";
     } else if (native && technique == UpscaleTechnique::XeSS) {
         selected = 3; preview = "Intel XeSS Native AA";
-    } else if (technique == UpscaleTechnique::FSR) {
-        preview = "Off (spatial FSR has no temporal AA)";
+    } else if (native && technique == UpscaleTechnique::FSR) {
+        selected = 4; preview = "AMD FSR Native AA";
     }
     if (ImGui::BeginCombo("Anti-aliasing", preview)) {
         const char* names[] = {"Off", "Temporal AA (TAA)",
-            "NVIDIA DLAA (native resolution)", "Intel XeSS Native AA"};
-        for (int mode = 0; mode < 4; ++mode) {
-            const bool available = mode < 2 || (mode == 2 ? renderer.IsDLSSSupported() : renderer.IsXeSSSupported());
+            "NVIDIA DLAA (native resolution)", "Intel XeSS Native AA", "AMD FSR Native AA"};
+        for (int mode = 0; mode < 5; ++mode) {
+            const bool available = mode < 2 || (mode == 2 ? renderer.IsDLSSSupported() : mode == 3 ? renderer.IsXeSSSupported() : renderer.IsFSRSupported());
             ImGui::BeginDisabled(!available);
             if (ImGui::Selectable(names[mode], selected == mode)) {
                 ApplyAntiAliasing(renderer, mode);
             }
             ImGui::EndDisabled();
         }
-        ImGui::BeginDisabled();
-        ImGui::Selectable("AMD FSR Native AA (not integrated)", false);
-        ImGui::EndDisabled();
         ImGui::EndCombo();
     }
     if (selected >= 2) {
         ImGui::TextWrapped("Native AA renders at display resolution. It improves edges without reducing render resolution.");
-        const bool active = selected == 2 ? renderer.IsDLSSActive() : renderer.IsXeSSActive();
+        const bool active = selected == 2 ? renderer.IsDLSSActive() : selected == 3 ? renderer.IsXeSSActive() : renderer.IsFSRActive();
         ImGui::Text("SDK evaluation: %s", active ? "active" : "pending / unavailable");
     }
     if (renderer.GetUpscaleTechnique() == UpscaleTechnique::DLSS) {

@@ -3,9 +3,9 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <iostream>
-#include "../ThirdParty/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_api_loader.h"
-#include "../ThirdParty/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_upscale.h"
-#include "../ThirdParty/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/dx12/ffx_api_dx12.h"
+#include "../../ThirdParty/AMD/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_api_loader.h"
+#include "../../ThirdParty/AMD/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/ffx_upscale.h"
+#include "../../ThirdParty/AMD/FidelityFX-SDK-v1.1.4/ffx-api/include/ffx_api/dx12/ffx_api_dx12.h"
 int wmain(int argc,wchar_t**argv){
  if(argc!=2)return 2;
  auto module=LoadLibraryExW(argv[1],nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);

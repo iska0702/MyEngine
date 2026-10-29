@@ -88,6 +88,13 @@ void ParticleSystem::Shutdown() {
         m_constantBuffer->Unmap(0, nullptr);
         m_mappedCbv = nullptr;
     }
+    m_constantBuffer.Reset();
+    m_vertexBuffer.Reset();
+    m_indexBuffer.Reset();
+    m_additivePSO.Reset();
+    m_alphaPSO.Reset();
+    m_rootSignature.Reset();
+    m_device.Reset();
     m_initialized = false;
 }
 
@@ -517,6 +524,7 @@ void ParticleSystem::DrawUI(const XMFLOAT3& cameraPos, const XMFLOAT3& cameraFor
 
     ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "VFX Statistics:");
     ImGui::Text("Active Emitters: %zu | Total Particles: %zu", m_emitters.size(), GetTotalActiveParticles());
+    if (!m_initialized) ImGui::TextColored(ImVec4(1.f, 0.3f, 0.2f, 1.f), "Particle renderer unavailable; see the editor log.");
 
     ImGui::Separator();
     ImGui::TextColored(ImVec4(0.4f, 0.9f, 1.0f, 1.0f), "Spawn Presets (At Cam Target):");
@@ -530,8 +538,9 @@ void ParticleSystem::DrawUI(const XMFLOAT3& cameraPos, const XMFLOAT3& cameraFor
         SpawnExplosion(spawnTarget, 1.0f);
     }
     ImGui::SameLine();
-    if (ImGui::Button(" Campfire")) {
-        SpawnFire(spawnTarget, 1.0f);
+    static float fireIntensity = 1.0f;
+    if (ImGui::Button(" Fire")) {
+        SpawnFire(spawnTarget, fireIntensity);
     }
     ImGui::SameLine();
     if (ImGui::Button(" Sparks")) {
@@ -545,6 +554,7 @@ void ParticleSystem::DrawUI(const XMFLOAT3& cameraPos, const XMFLOAT3& cameraFor
     if (ImGui::Button(" Magic Vortex")) {
         SpawnMagicEnergy(spawnTarget, XMFLOAT4(0.3f, 0.8f, 1.0f, 1.0f));
     }
+    ImGui::SliderFloat("Fire intensity", &fireIntensity, 0.2f, 3.0f);
 
     ImGui::Separator();
     if (ImGui::Button(" Clear All Emitters")) {

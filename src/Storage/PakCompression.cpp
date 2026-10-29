@@ -7,7 +7,7 @@
 #define MINIZ_NO_ZLIB_APIS
 
 // Include miniz implementation
-#include "../../ThirdParty/miniz/miniz.h"
+#include "../../ThirdParty/Libraries/miniz/miniz.h"
 
 namespace PakCompression {
 

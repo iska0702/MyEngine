@@ -48,5 +48,5 @@ PSInput TessDS(TessPatch f,float3 b:SV_DomainLocation,const OutputPatch<TessVert
     PSInput o;o.position=mul(world,ViewProj);o.worldPos=world.xyz;
     o.normal=normalize(mul(normal,cofactors)*(dot(basis[0],cofactors[0])<0?-1:1));
     o.color=1;o.uv=p[0].uv*b.x+p[1].uv*b.y+p[2].uv*b.z;
-    o.curPos=mul(world,CleanViewProj);o.prevPos=mul(world,PrevCleanViewProj);return o;
+    o.curPos=mul(world,CleanViewProj);o.prevPos=mul(mul(float4(position,1),PreviousModel),PrevCleanViewProj);return o;
 }

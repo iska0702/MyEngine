@@ -24,7 +24,7 @@ Write-Host "====================================================================
 # 1. Locate OpenOrbis PS4 Toolchain
 # ------------------------------------------------------------------------------
 if (-not $ToolchainPath -or -not (Test-Path $ToolchainPath)) {
-    $defaultPath = Join-Path $ScriptDir "ThirdParty/OpenOrbis-PS4-Toolchain"
+    $defaultPath = Join-Path $ScriptDir "ThirdParty/OpenSource/OpenOrbis-PS4-Toolchain"
     if (Test-Path $defaultPath) {
         $ToolchainPath = $defaultPath
     } else {
@@ -55,8 +55,8 @@ if (-not (Test-Path $MakeFselfScript)) {
 # ------------------------------------------------------------------------------
 $ZigExe = $null
 $zigCandidates = @(
-    (Join-Path $ScriptDir "ThirdParty\zig\zig-windows-x86_64-0.13.0\zig.exe"),
-    (Join-Path $ScriptDir "ThirdParty\zig\zig.exe")
+    (Join-Path $ScriptDir "ThirdParty\OpenSource\zig\zig-windows-x86_64-0.13.0\zig.exe"),
+    (Join-Path $ScriptDir "ThirdParty\OpenSource\zig\zig.exe")
 )
 foreach ($c in $zigCandidates) {
     if (Test-Path $c) {
@@ -69,7 +69,7 @@ if (-not $ZigExe) {
     if ($cmd) { $ZigExe = $cmd.Source }
 }
 if (-not $ZigExe) {
-    Write-Error "Zig compiler not found! Please ensure Zig is placed in ThirdParty\zig\"
+    Write-Error "Zig compiler not found! Please ensure Zig is placed in ThirdParty\OpenSource\zig\"
     exit 1
 }
 Write-Host "[Compiler] Zig Executable:  $ZigExe" -ForegroundColor Green
@@ -194,8 +194,8 @@ if (-not $SkipContentPack) {
 # 8. Define PS4 Client Sources
 # ------------------------------------------------------------------------------
 $c_sources = @(
-    "ThirdParty/EngineDependencies/lua54/lua-5.4.7/src/onelua.c",
-    "ThirdParty/EngineDependencies/ufbx.c"
+    "ThirdParty/Libraries/EngineDependencies/lua54/lua-5.4.7/src/onelua.c",
+    "ThirdParty/Libraries/EngineDependencies/ufbx.c"
 )
 
 $cpp_sources = @(
@@ -279,15 +279,15 @@ $includes = @(
     "-I", "src/Audio",
     "-I", "src/Storage",
     "-I", "src/Sequencer",
-    "-I", "ThirdParty/EngineDependencies",
+    "-I", "ThirdParty/Libraries/EngineDependencies",
     "-I", "src/Platform",
     "-I", "src/Platform/DirectXMath",
     "-I", "src/Platform/WindowsCompat",
     "-I", "src/imgui",
     "-I", $IncludeDir,
-    "-I", "ThirdParty/PhysX/physx/include",
+    "-I", "ThirdParty/NVIDIA/PhysX/physx/include",
     "-I", "ThirdParty/Steamworks/include",
-    "-I", "ThirdParty/discord_social_sdk/include"
+    "-I", "ThirdParty/Discord/discord_social_sdk/include"
 )
 
 $defines = @(

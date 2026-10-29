@@ -8,5 +8,5 @@ PSInput RasterVS(uint id:SV_VertexID){
     PSInput o;o.position=mul(world,ViewProj);o.worldPos=world.xyz;
     o.normal=normalize(mul(v.normal,cofactors)*(dot(basis[0],cofactors[0])<0?-1:1));
     o.color=1;o.uv=padIndices!=0?v.color.zw:ProjectedMeshUV(v.position,v.normal);
-    o.curPos=mul(world,CleanViewProj);o.prevPos=mul(world,PrevCleanViewProj);return o;
+    o.curPos=mul(world,CleanViewProj);o.prevPos=mul(mul(float4(v.position,1),PreviousModel),PrevCleanViewProj);return o;
 }

@@ -47,6 +47,7 @@ cbuffer SceneConstantBuffer : register(b0)
     float    padLights2;
     PointLightData pointLights[16];
     SpotLightData  spotLights[16];
+    row_major float4x4 PreviousModel;
 };
 
 Texture2D    g_Textures[1000] : register(t0, space0);
@@ -205,7 +206,7 @@ void MSMain(
             verts[outIdx].color = float4(1,1,1,1);
             verts[outIdx].uv = padIndices != 0 ? v.color.zw : ProjectedMeshUV(v.position,v.normal);
             verts[outIdx].curPos = mul(worldPos, CleanViewProj);
-            verts[outIdx].prevPos = mul(worldPos, PrevCleanViewProj);
+            verts[outIdx].prevPos = mul(mul(float4(v.position, 1), PreviousModel), PrevCleanViewProj);
         }
     }
 }

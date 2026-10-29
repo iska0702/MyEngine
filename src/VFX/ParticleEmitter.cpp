@@ -65,6 +65,7 @@ XMFLOAT3 ParticleEmitter::CalculateSpawnVelocity() const {
 }
 
 void ParticleEmitter::SpawnParticle() {
+    if (m_particles.empty()) return;
     // Find dead particle
     Particle* target = nullptr;
     for (auto& p : m_particles) {

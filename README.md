@@ -4,7 +4,7 @@ Experimental game engine and editor built primarily in C++ with DirectX 12.
 
 ## Windows build
 
-The Windows build requires Visual Studio with C++ tools, a Windows SDK, and the third-party SDKs expected by `build.bat` under `ThirdParty`. The repository keeps `ThirdParty/EngineDependencies` and `ThirdParty/miniz`; the other SDKs, their binaries, and local build tools are not included and must be installed separately. Paths to Visual Studio and the Windows SDK in `build.bat` may need to be adjusted for your machine.
+The Windows build requires Visual Studio with C++ tools, a Windows SDK, and the third-party SDKs expected by `build.bat` under `ThirdParty`. The repository keeps `ThirdParty/Libraries/EngineDependencies` and `ThirdParty/Libraries/miniz`; the other SDKs, their binaries, and local build tools are not included and must be installed separately. Paths to Visual Studio and the Windows SDK in `build.bat` may need to be adjusted for your machine.
 
 To build the standalone editor from a PowerShell prompt at the repository root:
 

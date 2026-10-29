@@ -32,7 +32,7 @@ bool DirectStorageSystem::Initialize(ID3D12Device* device) {
     wchar_t executable[32768]{};
     GetModuleFileNameW(nullptr, executable, 32768);
     const auto corePath = std::filesystem::path(executable).parent_path() /
-        L"ThirdParty" / L"DirectStorage" / L"dstoragecore.dll";
+        L"ThirdParty" / L"Microsoft" / L"DirectStorage" / L"dstoragecore.dll";
     m_coreModule = LoadLibraryExW(corePath.c_str(), nullptr,
         LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     if (!m_coreModule) {
