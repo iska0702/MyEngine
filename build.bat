@@ -20,7 +20,7 @@ if not exist "%VSWHERE%" (
     exit /b 1
 )
 set "VSINSTALL="
-for /f "usebackq delims=" %%V in (`"%VSWHERE%" -latest -products "*" -property installationPath`) do set "VSINSTALL=%%V"
+for /f "delims=" %%V in ('"%VSWHERE%" -latest -products * -property installationPath') do set "VSINSTALL=%%V"
 if not defined VSINSTALL (
     echo ERROR: Visual Studio installation not found.
     exit /b 1
