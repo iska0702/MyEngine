@@ -33,6 +33,7 @@ bool DiscordSystem::Initialize(uint64_t appId, const std::string& publicKey) {
         return true;
     }
 
+    if (!appId) { std::cerr << "[Discord] Application ID is required.\n"; return false; }
     m_appId = appId;
     if (!publicKey.empty()) {
         m_publicKey = publicKey;

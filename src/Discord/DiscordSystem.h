@@ -37,8 +37,7 @@ public:
     static DiscordSystem& Get();
 
     // Initialize Discord Social SDK
-    bool Initialize(uint64_t appId = 1545464334577041498ULL, 
-                    const std::string& publicKey = "864fa07d1ae93e986301163995d678293ee19220378a9b2cab1d2102be950431");
+    bool Initialize(uint64_t appId, const std::string& publicKey = "");
     void Shutdown();
 
     // Call once per frame in main engine loop
@@ -71,8 +70,8 @@ private:
     DiscordSystem& operator=(const DiscordSystem&) = delete;
 
     bool m_initialized = false;
-    uint64_t m_appId = 1545464334577041498ULL;
-    std::string m_publicKey = "864fa07d1ae93e986301163995d678293ee19220378a9b2cab1d2102be950431";
+    uint64_t m_appId = 0;
+    std::string m_publicKey;
     DiscordUserInfo m_userInfo;
     DiscordPresenceData m_presence;
 

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <random>
 #include <cctype>
+#include <cstdint>
 #include "ProjectTuning.h"
 
 namespace EngineProject {
@@ -30,6 +31,9 @@ struct Project {
     unsigned int steamAppId=480;
     bool steamRestart=false;
     std::string epicProductId,epicSandboxId,epicDeploymentId,epicClientId,epicClientSecret;
+    bool discordEnabled=false;
+    uint64_t discordAppId=0;
+    std::string discordState,discordDetails;
     float splashSeconds=2;
     int width=1280,height=720;
     bool startWithMenu=true;
@@ -59,6 +63,8 @@ struct Project {
         if(!(splashSeconds>=0&&splashSeconds<=120))throw std::runtime_error("Invalid splash duration");
         if(platform!="standalone"&&platform!="steam"&&platform!="epic")throw std::runtime_error("Invalid project platform");
         if(!steamAppId)throw std::runtime_error("Invalid Steam App ID");
+        if(discordEnabled && !discordAppId)throw std::runtime_error("Discord Application ID is required when Discord is enabled");
+        if(discordState.size()>128 || discordDetails.size()>128)throw std::runtime_error("Discord presence text is too long");
         if(content.empty()||editorScene.empty())throw std::runtime_error("Content and scene paths are required");
         for(auto& p:{content,editorScene,startupLevel,mainMenu,splash})Resolve(p);
     }
@@ -72,6 +78,8 @@ struct Project {
         field("shaderAppId",shaderAppId);
         field("epicProductId",epicProductId);field("epicSandboxId",epicSandboxId);field("epicDeploymentId",epicDeploymentId);
         field("epicClientId",epicClientId);field("epicClientSecret",epicClientSecret);
+        field("discordState",discordState);field("discordDetails",discordDetails);
+        out<<"discordEnabled "<<discordEnabled<<"\ndiscordAppId "<<discordAppId<<'\n';
         out<<"steamAppId "<<steamAppId<<"\nsteamRestart "<<steamRestart<<'\n';
         auto values=tuning;values.Visit([&](auto key,float value,auto,auto,auto,auto){out<<"tuning_"<<key<<' '<<value<<'\n';});
         out<<"splashSeconds "<<splashSeconds<<"\nwidth "<<width<<"\nheight "<<height<<"\nstartWithMenu "<<startWithMenu<<'\n';
@@ -105,10 +113,12 @@ struct Project {
             else if(key=="epicProductId")target=&p.epicProductId;else if(key=="epicSandboxId")target=&p.epicSandboxId;
             else if(key=="epicDeploymentId")target=&p.epicDeploymentId;else if(key=="epicClientId")target=&p.epicClientId;
             else if(key=="epicClientSecret")target=&p.epicClientSecret;
+            else if(key=="discordState")target=&p.discordState;else if(key=="discordDetails")target=&p.discordDetails;
             if(target)row>>std::quoted(*target);
             else if(key=="width")row>>p.width;else if(key=="height")row>>p.height;
             else if(key=="splashSeconds")row>>p.splashSeconds;else if(key=="startWithMenu")row>>p.startWithMenu;
             else if(key=="steamAppId")row>>p.steamAppId;else if(key=="steamRestart")row>>p.steamRestart;
+            else if(key=="discordEnabled")row>>p.discordEnabled;else if(key=="discordAppId")row>>p.discordAppId;
             else {
                 bool found=false;p.tuning.Visit([&](auto name,float& value,auto,auto,auto,auto){if(key==std::string("tuning_")+name){row>>value;found=true;}});
                 if(!found)throw std::runtime_error("Unknown project setting: "+key);

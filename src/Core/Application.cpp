@@ -709,8 +709,12 @@ bool Application::Initialize() {
 #endif
 #endif
 
-    LOG("App::Init Discord Social SDK (AppID: 1545464334577041498)");
-    EngineDiscord::DiscordSystem::Get().Initialize(1545464334577041498ULL, "864fa07d1ae93e986301163995d678293ee19220378a9b2cab1d2102be950431");
+    if (EngineProject::current.discordEnabled) {
+        auto& discord = EngineDiscord::DiscordSystem::Get();
+        discord.SetActivity(EngineProject::current.discordState, EngineProject::current.discordDetails);
+        LOG("App::Init Discord Social SDK (AppID: " << EngineProject::current.discordAppId << ")");
+        if (!discord.Initialize(EngineProject::current.discordAppId)) LOG("Discord initialization failed; continuing without Discord.");
+    } else LOG("Discord disabled in project settings.");
 
     LOG("App::Init window");
 
