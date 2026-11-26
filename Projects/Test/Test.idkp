@@ -15,6 +15,10 @@ epicSandboxId ""
 epicDeploymentId ""
 epicClientId ""
 epicClientSecret ""
+discordState ""
+discordDetails ""
+discordEnabled 0
+discordAppId 0
 steamAppId 480
 steamRestart 0
 tuning_gravityX 0

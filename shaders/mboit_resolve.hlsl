@@ -11,7 +11,6 @@ cbuffer CloudConstants : register(b0) {
     float cloudDensity;
 };
 
-Texture2D momentsTexture : register(t0);
 SamplerState pointSampler : register(s0);
 
 PSInput VSMain(uint vertexId : SV_VertexID) {
@@ -26,7 +25,8 @@ Texture2D<float> depthTexture : register(t1);
 #include "cloud_common.hlsl"
 
 float4 PSMain(PSInput input) : SV_Target {
-    if (cloudDensity <= 0.001f) return 0;
+    float daylightVisibility = smoothstep(-0.08f, 0.03f, -lightDir.y);
+    if (cloudDensity <= 0.001f || daylightVisibility <= 0.0f) return 0;
     // Use sample with UVs to be resolution-independent
     float rawDepth = depthTexture.SampleLevel(pointSampler, input.uv, 0).r;
 
@@ -49,16 +49,12 @@ float4 PSMain(PSInput input) : SV_Target {
     tEntry = max(tEntry, 0.1);
     tExit = min(tExit, 40000.0f); 
     
-    // Geometry depth testing
-    float4 clipScene = float4(ndc, rawDepth, 1.0);
-    float4 worldScene = mul(clipScene, invViewProj);
-    worldScene /= worldScene.w;
-    float sceneT = length(worldScene.xyz - cameraPos);
-    
-    if (rawDepth < 1.0) { 
-        tExit = min(tExit, sceneT); 
+    // Sky pixels have no opaque surface to unproject.
+    if (rawDepth < 1.0f) {
+        float4 worldScene = mul(float4(ndc, rawDepth, 1), invViewProj);
+        tExit = min(tExit, length(worldScene.xyz / worldScene.w - cameraPos));
     }
-    
+
     if (tEntry >= tExit) return float4(0, 0, 0, 0); 
     
     // Longer grazing rays retain more samples; short upward rays need fewer.
@@ -73,7 +69,7 @@ float4 PSMain(PSInput input) : SV_Target {
     float sunElevation = -lightDir.y;
     float dayFactor = saturate(sunElevation * 2.5f);
     float sunsetFactor = (sunElevation > -0.02f && sunElevation < 0.35f) ? exp(-pow((sunElevation - 0.08f) * 10.0f, 2.0f)) : 0.0f;
-    float nightLightScale = saturate(1.0f - saturate((-sunElevation - 0.10f) / 0.35f));
+    float nightLightScale = max(0.18f, saturate(1.0f - saturate((-sunElevation - 0.10f) / 0.35f)));
     float stormFactor = saturate((cloudDensity - 0.85f) / 1.80f);
     
     float2 sunHorizontal=(-lightDir.xz)/max(length(lightDir.xz),.001f);
@@ -144,5 +140,5 @@ float4 PSMain(PSInput input) : SV_Target {
     float horizonFade = smoothstep(0.005, 0.08, rayDir.y);
     opacity *= horizonFade;
     
-    return float4(scatteredLight * horizonFade, opacity);
+    return float4(scatteredLight * horizonFade * daylightVisibility, opacity * daylightVisibility);
 }

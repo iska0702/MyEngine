@@ -1,3 +1,4 @@
+#include <string_view>
 #include "PhysicsSystem.h"
 #if defined(_WIN32)
 #include "Renderer.h"
@@ -9,6 +10,7 @@
 #include "VehicleDynamics.h"
 #include "VehicleSimulation.h"
 #include "Scene/SceneGraph.h"
+#include "AI/NavigationSystem.h"
 #include <imgui.h>
 #include <chrono>
 #include <cmath>
@@ -775,7 +777,17 @@ void PhysicsSystem::Update(float dt, Renderer* renderer, Window* window, Camera*
                 if (Raycast(PxToXM3(start), PxToXM3(forward), 45.f, hit) && hit.ownerModelId != model.modelId)
                     nearest = (std::min)(nearest, hit.distance);
             }
-            const auto control = EngineAI::DriveRoad(model.vehicle,state.road,model.position.x,model.position.z,yaw,state.speed,nearest,dt);
+            auto crossingOccupied = [&](const RoadWaypoint& waypoint) {
+                auto inside = [&](const DirectX::XMFLOAT3& position) {
+                    const float x = position.x - waypoint.x, z = position.z - waypoint.z;
+                    return std::abs(position.y - waypoint.y) <= 3.f &&
+                        x*x + z*z <= waypoint.crossingRadius * waypoint.crossingRadius;
+                };
+                if (!m_drivenVehicle && camera && !camera->IsFreecamMode() && inside(camera->GetPosition())) return true;
+                const auto& agents = EngineAI::NavigationSystem::Get().GetAgents();
+                return std::any_of(agents.begin(), agents.end(), [&](const auto& agent) { return inside(agent->GetPosition()); });
+            };
+            const auto control = EngineAI::DriveRoad(model.vehicle,state.road,model.position.x,model.position.z,yaw,state.speed,nearest,dt,crossingOccupied);
             SetVehicleInput(model.modelId,control.throttle,control.steer,control.brake);
         }
     };

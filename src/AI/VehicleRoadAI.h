@@ -3,19 +3,25 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <functional>
 namespace EngineAI {
 struct VehicleRoadState { size_t waypoint=0; float stoppedFor=0; bool complete=false; };
 struct VehicleRoadControl { float throttle=0, steer=0, brake=1; };
 inline VehicleRoadControl DriveRoad(const EnginePhysics::VehicleSettings& settings, VehicleRoadState& state,
-                                    float x,float z,float yaw,float speed,float obstacleDistance,float dt) {
+                                    float x,float z,float yaw,float speed,float obstacleDistance,float dt,
+                                    const std::function<bool(const EnginePhysics::RoadWaypoint&)>& crossingOccupied = {}) {
     VehicleRoadControl out;
     if (!settings.aiEnabled || settings.route.empty() || state.complete || !std::isfinite(dt) || dt<=0 ||
         !std::isfinite(x) || !std::isfinite(z) || !std::isfinite(yaw) || !std::isfinite(speed)) return out;
     if (state.waypoint>=settings.route.size()) state.waypoint=0;
     const auto* point=&settings.route[state.waypoint];
+    auto mustYield = [&](const auto& waypoint) {
+        return waypoint.crossingRadius > 0 && crossingOccupied && crossingOccupied(waypoint);
+    };
     float dx=point->x-x,dz=point->z-z,dist=std::sqrt(dx*dx+dz*dz);
+    bool yielding = mustYield(*point);
     if (dist < 2.0f) {
-        if(point->redSignal) { state.stoppedFor=0; return out; }
+        if(point->redSignal || yielding) { state.stoppedFor=0; return out; }
         if(point->stop) {
             if(std::abs(speed)>0.5f) { state.stoppedFor=0; return out; }
             state.stoppedFor+=dt;
@@ -27,6 +33,7 @@ inline VehicleRoadControl DriveRoad(const EnginePhysics::VehicleSettings& settin
             state.waypoint=0;
         }
         point=&settings.route[state.waypoint]; dx=point->x-x;dz=point->z-z;dist=std::sqrt(dx*dx+dz*dz);
+        yielding = mustYield(*point);
     }
     float error=std::atan2(dx,dz)-yaw;
     while(error>3.14159265f)error-=6.2831853f;
@@ -34,7 +41,10 @@ inline VehicleRoadControl DriveRoad(const EnginePhysics::VehicleSettings& settin
     out.steer=(std::clamp)(error*1.4f,-1.f,1.f);
     float target=(std::min)(settings.maxSpeed,point->speedLimit);
     target *= (std::max)(0.25f,1.f-std::abs(error)*0.55f);
-    if(point->stop||point->redSignal) target=(std::min)(target,std::sqrt(2.f*3.f*(std::max)(0.f,dist-1.2f)));
+    if(point->stop||point->redSignal||yielding) {
+        const float stopDistance = yielding ? (std::max)(2.f, point->crossingRadius + 1.f) : 1.2f;
+        target=(std::min)(target,std::sqrt(2.f*3.f*(std::max)(0.f,dist-stopDistance)));
+    }
     if(std::isfinite(obstacleDistance)) target=(std::min)(target,std::sqrt(2.f*4.f*(std::max)(0.f,obstacleDistance-3.f)));
     if(speed< -0.5f) {out.brake=1;return out;}
     const float delta=target-speed;

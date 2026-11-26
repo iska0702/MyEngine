@@ -5,6 +5,7 @@
 #include "Debug/Profiler.h"
 #include "VFX/ParticleSystem.h"
 #include "DxrTransform.h"
+#include "ShadowCulling.h"
 #include "Common/SceneLighting.h"
 #include "Core/DiagnosticPaths.h"
 #include "Storage/ContentIO.h"
@@ -32,6 +33,7 @@ static bool s_frameSynchronized=false;
 #include <dxcapi.h>
 #include <sstream>
 #include <algorithm>
+#include <limits>
 #include <iomanip>
 #include <atomic>
 #include <vector>
@@ -49,8 +51,10 @@ static bool s_frameSynchronized=false;
 #include "Crypto.h"
 #include "PakCompression.h"
 #include "Storage/DirectStorage/DirectStorageSystem.h"
+#include "Upscaling/DLSS/DLSSSystem.h"
 #include "Upscaling/XeSS/XeSSSystem.h"
 #include "Upscaling/FSR/FidelityFXFrameGeneration.h"
+#include "RayTracing/DXR/DXRSystem.h"
 #include <directx/d3dx12.h>
 
 std::vector<uint8_t> Renderer::LoadFromPak(const std::wstring& targetFile) {
@@ -1111,6 +1115,7 @@ Renderer::Renderer(int width, int height)
     m_constantBufferData.lightColor = XMFLOAT3(1.0f, 0.9f, 0.8f);
     m_constantBufferData.cameraPos = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
+    m_dlssSystem = std::make_unique<EngineRender::DLSSSystem>();
     UpdateSunFromAngles();
 }
 
@@ -1149,7 +1154,7 @@ void Renderer::UpdateSunFromAngles() {
     }
     float nightFactor = (height <= -0.25f) ? 1.0f : (height < 0.0f ? (-height / 0.25f) : 0.0f);
 
-    float nightIntensity = (std::clamp)(1.0f - (std::clamp)((-height - 0.10f) / 0.35f, 0.0f, 1.0f), 0.0f, 1.0f);
+    float nightIntensity = (std::max)(0.18f, (std::clamp)(1.0f - (std::clamp)((-height - 0.10f) / 0.35f, 0.0f, 1.0f), 0.0f, 1.0f));
     XMFLOAT3 dayColor = XMFLOAT3(1.0f, 0.98f, 0.95f);
     XMFLOAT3 sunsetColor = XMFLOAT3(1.0f, 0.55f, 0.20f);
     XMFLOAT3 twilightColor = XMFLOAT3(0.20f, 0.24f, 0.35f);
@@ -1232,82 +1237,8 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
     m_camera = camera;
     m_hwnd = hwnd;
 
-    {
-        // Streamline plugins live in ThirdParty/NVIDIA/Streamline.
-        wchar_t exePath[MAX_PATH];
-        std::wstring exeDir;
-        if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) > 0) {
-            std::wstring ws(exePath);
-            size_t lastSlash = ws.find_last_of(L"\\/");
-            if (lastSlash != std::wstring::npos) {
-                exeDir = ws.substr(0, lastSlash);
-                SetCurrentDirectoryW(exeDir.c_str());
-            }
-        }
-
-        std::wstring nvidiaDir = exeDir + L"\\ThirdParty\\NVIDIA\\Streamline";
-        SetDllDirectoryW(nvidiaDir.c_str());
-
-        {
-            auto tryLoad = [&](const wchar_t* dllName)
-            {
-                auto toUtf8 = [](const wchar_t* ws) -> std::string
-                {
-                    if (!ws) return {};
-                    int required = WideCharToMultiByte(CP_UTF8, 0, ws, -1, nullptr, 0, nullptr, nullptr);
-                    if (required <= 0) return {};
-                    std::string out;
-                    out.resize(static_cast<size_t>(required - 1));
-                    WideCharToMultiByte(CP_UTF8, 0, ws, -1, out.data(), required, nullptr, nullptr);
-                    return out;
-                };
-
-                std::wstring fullPath = nvidiaDir + L"\\" + dllName;
-                HMODULE h = LoadLibraryW(fullPath.c_str());
-                if (h)
-                {
-                    FreeLibrary(h);
-                    LOG("Precheck LoadLibrary OK: " << toUtf8(fullPath.c_str()));
-                }
-                else
-                {
-                    DWORD err = GetLastError();
-                    LOG("Precheck LoadLibrary FAILED: " << toUtf8(fullPath.c_str()) << " GetLastError=" << err);
-                }
-            };
-
-            tryLoad(L"nvngx_dlss.dll");
-            tryLoad(L"nvngx_dlssd.dll");
-            tryLoad(L"nvngx_deepdvc.dll");
-            tryLoad(L"nvngx_dlssg.dll");
-        }
-
-        sl::Preferences slPref = {};
-        slPref.showConsole = false;
-        slPref.logLevel = sl::LogLevel::eDefault;
-        slPref.logMessageCallback=[](sl::LogType,const char* message){if(message)EngineLog::Write(std::string("[Streamline] ")+message);};
-        slPref.applicationId = 1; 
-        sl::Feature featuresToLoad[] = { sl::kFeatureDLSS, sl::kFeatureReflex, sl::kFeatureDLSS_G,sl::kFeaturePCL,sl::kFeatureDLSS_RR };
-        slPref.featuresToLoad = featuresToLoad;
-        slPref.numFeaturesToLoad = uint32_t(std::size(featuresToLoad));
-        slPref.renderAPI = sl::RenderAPI::eD3D12;
-        slPref.flags = sl::PreferenceFlags::eUseFrameBasedResourceTagging | sl::PreferenceFlags::eDisableDebugText;
-        
-        static std::wstring absPluginNvidia;
-        static std::wstring absExeDir;
-        absExeDir = exeDir;
-        absPluginNvidia = nvidiaDir;
-        const wchar_t* pluginPaths[] = { absPluginNvidia.c_str(), absExeDir.c_str() };
-        slPref.pathsToPlugins = pluginPaths;
-        slPref.numPathsToPlugins = 2;
-
-        sl::Result slInitRes = slInit(slPref);
-        m_streamlineInitialized=slInitRes==sl::Result::eOk;
-        if (slInitRes != sl::Result::eOk)
-        {
-            LOG("Streamline slInit FAILED (code=" << (int)slInitRes << ")");
-        }
-    }
+    if (!m_dlssSystem) m_dlssSystem = std::make_unique<EngineRender::DLSSSystem>();
+    m_streamlineInitialized = m_dlssSystem->PrecheckAndInitializeStreamline();
 
     UINT dxgiFactoryFlags = 0;
 
@@ -1383,48 +1314,14 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
     }
 
     m_pipelineCache.Initialize(m_device.Get());
-    if (slSetD3DDevice(m_device.Get()) == sl::Result::eOk) {
-        LOG("Streamline D3D Device Set");
-        
-        LUID adapterLuid = m_device->GetAdapterLuid();
-        sl::AdapterInfo adapterInfo = {};
-        adapterInfo.deviceLUID = (uint8_t*)&adapterLuid;
-        adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
-
-        if (slIsFeatureSupported(sl::kFeatureDLSS, adapterInfo) == sl::Result::eOk) {
-            m_dlssSupported = true;
-            LOG("DLSS Hardware: Supported");
-        } else {
-            m_dlssSupported = false;
-            LOG("DLSS Hardware: Not Supported, falling back to Native/FSR2");
-        }
-
-        if (slIsFeatureSupported(sl::kFeatureDLSS_G, adapterInfo) == sl::Result::eOk) {
-            m_dlssGSupported = true;
-            sl::DLSSGState capabilities{};
-            if(slDLSSGGetState(sl::ViewportHandle{0},capabilities,nullptr)==sl::Result::eOk)
-                m_dlssGMaxMultiplier=(std::max)(2,int((std::min)(capabilities.numFramesToGenerateMax,31u))+1);
-            LOG("DLSS-G Frame Generation Hardware: Supported");
-        } else {
-            m_dlssGSupported = false;
-            LOG("DLSS-G Frame Generation Hardware: Not Supported");
-        }
-
-        if (slIsFeatureSupported(sl::kFeatureDLSS_RR, adapterInfo) == sl::Result::eOk) {
-            m_dlssRRSupported = true;
-            LOG("DLSS-RR Ray Reconstruction Hardware: Supported");
-        } else {
-            m_dlssRRSupported = false;
-            LOG("DLSS-RR Ray Reconstruction Hardware: Not Supported");
-        }
-
-        if (slIsFeatureSupported(sl::kFeatureReflex, adapterInfo) == sl::Result::eOk) {
-            m_reflexSupported = true;
-            LOG("Reflex Hardware: Supported");
+    if (m_dlssSystem && m_dlssSystem->SetD3DDevice(m_device.Get())) {
+        m_dlssSupported = m_dlssSystem->IsDLSSSupported();
+        m_dlssGSupported = m_dlssSystem->IsDLSSGSupported();
+        m_dlssGMaxMultiplier = m_dlssSystem->GetDLSSGMaxMultiplier();
+        m_dlssRRSupported = m_dlssSystem->IsDLSSRRSupported();
+        m_reflexSupported = m_dlssSystem->IsReflexSupported();
+        if (m_reflexSupported) {
             SetReflexMode(m_reflexMode);
-        } else {
-            m_reflexSupported = false;
-            LOG("Reflex Hardware: Not Supported");
         }
     }
 
@@ -1436,7 +1333,15 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
     D3D12_FEATURE_DATA_D3D12_OPTIONS5 rayOptions{};
     m_dxrAvailable=SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5,&rayOptions,sizeof(rayOptions)))&&rayOptions.RaytracingTier>=D3D12_RAYTRACING_TIER_1_1;
     if(BackendArgument(L"--benchmark-no-dxr-hardware"))m_dxrAvailable=false;
-    if(m_dxrAvailable)m_device.As(&m_dxrDevice);else{m_dxrDevice.Reset();m_dxrEnabled=false;m_ssgiEnabled=false;}
+    m_dxrSystem = std::make_unique<EngineRender::DXRSystem>();
+    if(m_dxrAvailable) {
+        m_dxrSystem->Initialize(m_device.Get(), m_commandList.Get());
+        m_device.As(&m_dxrDevice);
+    } else {
+        m_dxrDevice.Reset();
+        m_dxrEnabled=false;
+        m_ssgiEnabled=false;
+    }
     m_cullingProbeOutside=BackendArgument(L"--benchmark-cull-outside");
     m_buildDepthPyramid=BackendArgument(L"--benchmark-pipeline-depth-pyramid");
     InitializeBackendQueries();
@@ -1583,7 +1488,7 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
 
     D3D12_DESCRIPTOR_RANGE1 space1Range = {};
     space1Range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    space1Range.NumDescriptors = 8; // t3 to t10
+    space1Range.NumDescriptors = 10; // t3 to t12
     space1Range.BaseShaderRegister = 3;
     space1Range.RegisterSpace = 1;
     space1Range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
@@ -2139,7 +2044,7 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
     LOG("Meshlets built successfully: " << m_meshletCount);
 
     D3D12_RESOURCE_DESC cbDesc = vbDesc;
-    cbDesc.Width = 1024 * 1024;
+    cbDesc.Width = 32 * 1024 * 1024;
 
     if (FAILED(m_device->CreateCommittedResource(
         &m_heapPropsUpload, D3D12_HEAP_FLAG_NONE, &cbDesc,
@@ -4124,7 +4029,6 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
         LOG("Conservative Raster Supported: " << (m_conservativeRasterSupported ? "YES" : "NO"));
     }
 
-#ifndef ENGINE_RELEASE
     LOG("Initializing ImGui");
     {
         D3D12_DESCRIPTOR_HEAP_DESC imguiHeapDesc = {};
@@ -4154,8 +4058,6 @@ bool Renderer::Initialize(HWND hwnd, Camera* camera) {
         ImGui_ImplDX12_Init(&initInfo);
         m_imguiInitialized = true;
     }
-#endif
-
     m_commandList->Close();
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
     LOG("Executing Command Lists and Waiting");
@@ -4267,6 +4169,19 @@ void Renderer::SetAnisotropy(int aniso) {
 
 
 
+void Renderer::UpdateDynamicResolution(bool enabled, int targetFps, int minimumScale, float dt) {
+    const bool active = enabled && m_upscaleTechnique == UpscaleTechnique::FSR && m_fsr2Initialized &&
+        !m_fsrFrameGenEnabled && !m_xessFrameGenEnabled && !m_dlssGRequested;
+    if (active != m_dynamicResolutionActive) {
+        m_dynamicResolutionActive = active;
+        m_dynamicResolution.Reset();
+        if (m_upscaleTechnique == UpscaleTechnique::FSR) m_pendingResize = true;
+    }
+    if (active && !m_pendingResize && m_framesAfterResize == 0 &&
+        m_dynamicResolution.Update(m_lastGpuFrameMs, dt, targetFps, minimumScale))
+        m_pendingResize = true;
+}
+
 void Renderer::Resize(int width, int height) {
     if (width <= 0 || height <= 0) {
         return;
@@ -4296,6 +4211,10 @@ void Renderer::Resize(int width, int height) {
         }
         m_renderWidth = (std::max)(1, (int)(width / scale));
         m_renderHeight = (std::max)(1, (int)(height / scale));
+        if (m_dynamicResolutionActive) {
+            m_renderWidth = (std::max)(1, width * m_dynamicResolution.Scale() / 100);
+            m_renderHeight = (std::max)(1, height * m_dynamicResolution.Scale() / 100);
+        }
     } else if (m_upscaleTechnique == UpscaleTechnique::DLSS) {
         sl::DLSSOptions dlssOpts = {};
         switch (m_upscaleQuality) {
@@ -4490,6 +4409,48 @@ void Renderer::Resize(int width, int height) {
         }
     }
 
+    if (!m_spotShadowMap) {
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = 2048; desc.Height = 2048; desc.DepthOrArraySize = 1; desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1; desc.Format = DXGI_FORMAT_R32_TYPELESS;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN; desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        D3D12_CLEAR_VALUE clear = {}; clear.Format = DXGI_FORMAT_D32_FLOAT; clear.DepthStencil.Depth = 1.0f;
+        HRESULT shadowHr = m_device->CreateCommittedResource(&m_heapPropsDefault, D3D12_HEAP_FLAG_NONE,
+            &desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clear, IID_PPV_ARGS(&m_spotShadowMap));
+        if (FAILED(shadowHr)) LOG("Spot shadow atlas creation failed: " << std::hex << shadowHr);
+        else { m_spotShadowState = D3D12_RESOURCE_STATE_DEPTH_WRITE; m_spotShadowMap->SetName(L"Local spotlight shadow atlas"); }
+    }
+    {
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {}; dsv.Format = DXGI_FORMAT_D32_FLOAT; dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        auto handle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart(); handle.ptr += 2 * m_dsvDescriptorSize;
+        if (m_spotShadowMap) m_device->CreateDepthStencilView(m_spotShadowMap.Get(), &dsv, handle);
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv = {}; srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv.Format = DXGI_FORMAT_R32_FLOAT; srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; srv.Texture2D.MipLevels = 1;
+        auto srvHandle = m_mainDescHeap->GetCPUDescriptorHandleForHeapStart(); srvHandle.ptr += UINT64(1508) * m_cbvSrvDescriptorSize;
+        m_device->CreateShaderResourceView(m_spotShadowMap.Get(), &srv, srvHandle);
+    }
+
+    if (!m_pointShadowMap) {
+        D3D12_RESOURCE_DESC desc={}; desc.Dimension=D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width=1536;desc.Height=2048;desc.DepthOrArraySize=1;desc.MipLevels=1;desc.SampleDesc.Count=1;
+        desc.Format=DXGI_FORMAT_R32_TYPELESS;desc.Layout=D3D12_TEXTURE_LAYOUT_UNKNOWN;desc.Flags=D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        D3D12_CLEAR_VALUE clear={};clear.Format=DXGI_FORMAT_D32_FLOAT;clear.DepthStencil.Depth=1;
+        HRESULT hr=m_device->CreateCommittedResource(&m_heapPropsDefault,D3D12_HEAP_FLAG_NONE,&desc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE,&clear,IID_PPV_ARGS(&m_pointShadowMap));
+        if(FAILED(hr))LOG("Point shadow atlas creation failed: "<<std::hex<<hr);
+        else {m_pointShadowState=D3D12_RESOURCE_STATE_DEPTH_WRITE;m_pointShadowMap->SetName(L"Local point shadow atlas");}
+    }
+    {
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsv={};dsv.Format=DXGI_FORMAT_D32_FLOAT;dsv.ViewDimension=D3D12_DSV_DIMENSION_TEXTURE2D;
+        auto dsvHandle=m_dsvHeap->GetCPUDescriptorHandleForHeapStart();dsvHandle.ptr+=3*m_dsvDescriptorSize;
+        if(m_pointShadowMap)m_device->CreateDepthStencilView(m_pointShadowMap.Get(),&dsv,dsvHandle);
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv={};srv.Shader4ComponentMapping=D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv.Format=DXGI_FORMAT_R32_FLOAT;srv.ViewDimension=D3D12_SRV_DIMENSION_TEXTURE2D;srv.Texture2D.MipLevels=1;
+        auto srvHandle=m_mainDescHeap->GetCPUDescriptorHandleForHeapStart();srvHandle.ptr+=UINT64(1509)*m_cbvSrvDescriptorSize;
+        m_device->CreateShaderResourceView(m_pointShadowMap.Get(),&srv,srvHandle);
+    }
+
     if (m_shadowMapTexture) {
         // DSV at slot 1 in m_dsvHeap
         D3D12_DEPTH_STENCIL_VIEW_DESC shadowDsvDesc = {};
@@ -4640,14 +4601,6 @@ void Renderer::Resize(int width, int height) {
             srvHandle.ptr += m_historyColorSrvIndex * m_cbvSrvDescriptorSize;
             m_device->CreateShaderResourceView(m_historyColorTexture.Get(), &srvDesc, srvHandle);
 
-            // UAV
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-            uavDesc.Format = desc.Format;
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-            
-            D3D12_CPU_DESCRIPTOR_HANDLE uavHandle = m_mainDescHeap->GetCPUDescriptorHandleForHeapStart();
-            uavHandle.ptr += m_historyColorUavIndex * m_cbvSrvDescriptorSize;
-            m_device->CreateUnorderedAccessView(m_upscaledColorTexture.Get(), nullptr, &uavDesc, uavHandle);
         } else {
             LOG("Resize: TAA history CreateCommittedResource FAILED");
         }
@@ -4721,6 +4674,14 @@ void Renderer::Resize(int width, int height) {
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MipLevels = 1;
         m_device->CreateShaderResourceView(m_upscaledColorTexture.Get(), &srvDesc, srvHandle);
+        if (m_upscaledColorTexture) {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uav = {};
+            uav.Format = desc.Format;
+            uav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            auto handle = m_mainDescHeap->GetCPUDescriptorHandleForHeapStart();
+            handle.ptr += m_historyColorUavIndex * m_cbvSrvDescriptorSize;
+            m_device->CreateUnorderedAccessView(m_upscaledColorTexture.Get(), nullptr, &uav, handle);
+        }
         if (m_upscaledColorTexture) m_upscaledColorTexture->SetName(L"UpscaledColorTexture");
     }
 
@@ -5346,6 +5307,110 @@ void Renderer::Render(float dt) {
     XMMATRIX sunViewProj = sunView * snapMatrix * sunProj;
     m_constantBufferData.sunViewProj = sunViewProj;
     EngineRender::UploadSceneLights(m_constantBufferData,m_pointLights,m_spotLights);
+    // Keep authored lights first, then allocate remaining slots to nearby vehicles.
+    struct HeadlightCandidate { float distanceSquared; XMFLOAT3 position; XMFLOAT3 rotation; };
+    std::vector<HeadlightCandidate> headlightCandidates;
+    const XMFLOAT3 eye = m_camera->GetPosition();
+    auto collectVehicleHeadlights = [&](const auto& models) {
+        for (const auto& model : models) {
+            if (!model.visible || !model.vehicle.enabled || model.vehicle.part != 0) continue;
+            const float x = model.position.x - eye.x, y = model.position.y - eye.y, z = model.position.z - eye.z;
+            const float distanceSquared = x*x + y*y + z*z;
+            if (std::isfinite(distanceSquared)) headlightCandidates.push_back({distanceSquared, model.position, model.rotation});
+        }
+    };
+    collectVehicleHeadlights(m_models);
+    collectVehicleHeadlights(m_dynamicModels);
+    std::stable_sort(headlightCandidates.begin(), headlightCandidates.end(),
+        [](const auto& a, const auto& b) { return a.distanceSquared < b.distanceSquared; });
+    for (const auto& model : headlightCandidates) {
+        if (m_constantBufferData.numSpotLights + 2 > EngineRender::MAX_SPOT_LIGHTS) break;
+        XMMATRIX rotation = XMMatrixRotationRollPitchYaw(XMConvertToRadians(model.rotation.x),
+            XMConvertToRadians(model.rotation.y), XMConvertToRadians(model.rotation.z));
+        XMVECTOR position = XMLoadFloat3(&model.position);
+        for (int side : {-1, 1}) {
+            EngineRender::SpotLight lamp;
+            XMStoreFloat3(&lamp.position, position + XMVector3TransformNormal(XMVectorSet(side * .55f, .04f, 2.05f, 0), rotation));
+            XMStoreFloat3(&lamp.direction, XMVector3TransformNormal(XMVectorSet(0, -.13f, 1, 0), rotation));
+            lamp.color = {1.0f, .92f, .78f};
+            lamp.intensity = 180.0f; lamp.range = 40.0f;
+            lamp.innerAngle = 12.0f; lamp.outerAngle = 25.0f;
+            m_constantBufferData.spotLights[m_constantBufferData.numSpotLights++] = lamp.ToShaderData();
+        }
+    }
+
+    // Emissive lamp meshes do not illuminate other surfaces. Add separate,
+    // short-range red lights just behind the chassis in both raster and DXR.
+    for (const auto& model : headlightCandidates) {
+        if (m_constantBufferData.numPointLights + 2 > EngineRender::MAX_POINT_LIGHTS) break;
+        XMMATRIX rotation = XMMatrixRotationRollPitchYaw(XMConvertToRadians(model.rotation.x),
+            XMConvertToRadians(model.rotation.y), XMConvertToRadians(model.rotation.z));
+        XMVECTOR position = XMLoadFloat3(&model.position);
+        for (int side : {-1, 1}) {
+            EngineRender::PointLight lamp;
+            XMStoreFloat3(&lamp.position, position + XMVector3TransformNormal(XMVectorSet(side * .55f, .04f, -2.12f, 0), rotation));
+            lamp.color = {1.0f, .015f, .01f}; lamp.intensity = 0.8f; lamp.range = 4.0f;
+            m_constantBufferData.pointLights[m_constantBufferData.numPointLights++] = lamp.ToShaderData();
+        }
+    }
+
+    m_constantBufferData.spotShadowIndices = XMFLOAT4(-1, -1, -1, -1);
+    int spotShadowCount = 0;
+    bool allowSpotShadowMaps = true;
+#if defined(ENGINE_EDITOR)
+    if (GetEnvironmentVariableW(L"IDK_BENCHMARK_DISABLE_SPOT_SHADOWS", nullptr, 0) > 0) allowSpotShadowMaps = false;
+#endif
+    if (allowSpotShadowMaps && !m_dxrEnabled && m_spotShadowMap && m_vsmShadowPipelineState) {
+        struct Candidate { float distance; UINT index; };
+        std::vector<Candidate> candidates;
+        for (UINT i = 0; i < m_constantBufferData.numSpotLights; ++i) {
+            const auto& light = m_constantBufferData.spotLights[i];
+            const float x=light.position.x-eye.x, y=light.position.y-eye.y, z=light.position.z-eye.z;
+            const float distance=x*x+y*y+z*z;
+            if (light.intensity > 0 && light.range > .2f && std::isfinite(distance)) candidates.push_back({distance,i});
+        }
+        std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate& a,const Candidate& b){return a.distance<b.distance;});
+        for (const auto& candidate : candidates) {
+            if (spotShadowCount == 2) break;
+            const auto& light = m_constantBufferData.spotLights[candidate.index];
+            XMVECTOR direction=XMLoadFloat3(&light.direction);
+            if (XMVectorGetX(XMVector3LengthSq(direction)) < 1e-6f) continue;
+            direction=XMVector3Normalize(direction);
+            XMVECTOR up=std::abs(XMVectorGetY(direction)) > .98f ? XMVectorSet(0,0,1,0) : XMVectorSet(0,1,0,0);
+            XMVECTOR origin=XMLoadFloat3(&light.position);
+            const float outer=std::acos((std::clamp)(light.outerConeCos,-.99f,.999f));
+            const float fov=(std::clamp)(outer*2.f,.1f,3.0f);
+            m_constantBufferData.spotShadowViewProj[spotShadowCount] = XMMatrixLookToLH(origin,direction,up) * XMMatrixPerspectiveFovLH(fov,1.f,.1f,light.range);
+            (&m_constantBufferData.spotShadowIndices.x)[spotShadowCount] = static_cast<float>(candidate.index);
+            ++spotShadowCount;
+        }
+    }
+
+    m_constantBufferData.pointShadowParams = XMFLOAT4(-1,-1,-1,-1);
+    int pointShadowCount = 0;
+    if (allowSpotShadowMaps && !m_dxrEnabled && m_pointShadowMap && m_vsmShadowPipelineState) {
+        struct PointCandidate {float distance;UINT index;};
+        std::vector<PointCandidate> pointCandidates;
+        for(UINT i=0;i<m_constantBufferData.numPointLights;++i){
+            const auto& light=m_constantBufferData.pointLights[i];
+            float x=light.position.x-eye.x,y=light.position.y-eye.y,z=light.position.z-eye.z;
+            float distance=x*x+y*y+z*z;
+            if(light.intensity>0 && light.range>.2f && std::isfinite(distance) && distance<(light.range+20.f)*(light.range+20.f))
+                pointCandidates.push_back({distance,i});
+        }
+        std::stable_sort(pointCandidates.begin(),pointCandidates.end(),[](const auto& a,const auto& b){return a.distance<b.distance;});
+        const XMVECTOR directions[]={XMVectorSet(1,0,0,0),XMVectorSet(-1,0,0,0),XMVectorSet(0,1,0,0),XMVectorSet(0,-1,0,0),XMVectorSet(0,0,1,0),XMVectorSet(0,0,-1,0)};
+        const XMVECTOR ups[]={XMVectorSet(0,1,0,0),XMVectorSet(0,1,0,0),XMVectorSet(0,0,-1,0),XMVectorSet(0,0,1,0),XMVectorSet(0,1,0,0),XMVectorSet(0,1,0,0)};
+        for(const auto& candidate:pointCandidates){
+            if(pointShadowCount==2)break;
+            const auto& light=m_constantBufferData.pointLights[candidate.index];XMVECTOR origin=XMLoadFloat3(&light.position);
+            const XMMATRIX projection=XMMatrixPerspectiveFovLH(XM_PIDIV2,1,.1f,light.range);
+            for(int face=0;face<6;++face)m_constantBufferData.pointShadowViewProj[pointShadowCount*6+face]=XMMatrixLookToLH(origin,directions[face],ups[face])*projection;
+            if(pointShadowCount==0)m_constantBufferData.pointShadowParams.x=static_cast<float>(candidate.index);
+            else m_constantBufferData.pointShadowParams.y=static_cast<float>(candidate.index);
+            ++pointShadowCount;
+        }
+    }
 
     if (m_pCbvDataBegin) {
         memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(SceneConstantBuffer));
@@ -5365,7 +5430,7 @@ void Renderer::Render(float dt) {
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     auto gpuStamp=[&](UINT index){if(m_queryHeap&&m_queryReadbackBuffer)m_commandList->EndQuery(m_queryHeap.Get(),D3D12_QUERY_TYPE_TIMESTAMP,index);};
-    if(!m_dxrAvailable){m_dxrEnabled=false;m_ssgiEnabled=false;}
+    if(!m_dxrAvailable) m_dxrEnabled=false;
     if(m_cullingProbeOutside)m_vsmEnabled=false;
     // Update DXR Raytracing acceleration structures at the beginning of the frame
     if (m_dxrEnabled && m_dxrDevice) {
@@ -5428,7 +5493,7 @@ void Renderer::Render(float dt) {
 
             currentCbIndex++;
             UINT64 cbOffset = (UINT64)currentCbIndex * cbStride;
-            if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 1024 * 1024) {
+            if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 32 * 1024 * 1024) {
                 memcpy(reinterpret_cast<UINT8*>(m_pCbvDataBegin) + cbOffset, &cbData, sizeof(SceneConstantBuffer));
             }
             m_commandList->SetGraphicsRootConstantBufferView(0, m_constantBuffer->GetGPUVirtualAddress() + cbOffset);
@@ -5458,7 +5523,7 @@ void Renderer::Render(float dt) {
 
             currentCbIndex++;
             UINT64 cbOffset = (UINT64)currentCbIndex * cbStride;
-            if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 1024 * 1024) {
+            if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 32 * 1024 * 1024) {
                 memcpy(reinterpret_cast<UINT8*>(m_pCbvDataBegin) + cbOffset, &cbData, sizeof(SceneConstantBuffer));
             }
             m_commandList->SetGraphicsRootConstantBufferView(0, m_constantBuffer->GetGPUVirtualAddress() + cbOffset);
@@ -5479,6 +5544,148 @@ void Renderer::Render(float dt) {
         if (m_meshletsBuffer) m_commandList->SetGraphicsRootShaderResourceView(4, m_meshletsBuffer->GetGPUVirtualAddress());
 
         Transition(m_commandList.Get(), m_shadowMapTexture.Get(), m_shadowMapState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    }
+
+    // Build conservative object-space bounds once, then reject static models
+    // outside each local light face before recording draw commands. Imported
+    // dynamic models and unknown bounds stay on the conservative draw path.
+    std::vector<float> localShadowRadii(m_models.size(), -1.f);
+    if (spotShadowCount > 0 || pointShadowCount > 0) {
+        for (size_t i=0; i<m_models.size(); ++i) {
+            const auto& model=m_models[i];
+            if (!model.visible || model.material.tessellation.enabled || !model.meshletCount ||
+                uint64_t(model.meshletStart)+model.meshletCount > m_cpuMeshlets.size()) continue;
+            float radius=0.f;
+            bool valid=true;
+            for (UINT j=0; j<model.meshletCount; ++j) {
+                const auto& meshlet=m_cpuMeshlets[model.meshletStart+j];
+                const float x=meshlet.Center[0], y=meshlet.Center[1], z=meshlet.Center[2];
+                const float extent=std::sqrt(x*x+y*y+z*z)+meshlet.Radius;
+                if (!std::isfinite(extent) || meshlet.Radius < 0) { valid=false; break; }
+                radius=(std::max)(radius,extent);
+            }
+            const float maxScale=(std::max)({std::abs(model.scale.x),std::abs(model.scale.y),std::abs(model.scale.z)});
+            if (valid && std::isfinite(maxScale) && radius>0 && maxScale>0) localShadowRadii[i]=radius*maxScale;
+        }
+    }
+
+    // Render the two closest spotlights into separate 1024-square atlas tiles.
+    if (spotShadowCount > 0) {
+        Transition(m_commandList.Get(),m_spotShadowMap.Get(),m_spotShadowState,D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        auto dsv=m_dsvHeap->GetCPUDescriptorHandleForHeapStart(); dsv.ptr += 2 * m_dsvDescriptorSize;
+        m_commandList->ClearDepthStencilView(dsv,D3D12_CLEAR_FLAG_DEPTH,1.f,0,0,nullptr);
+        m_commandList->OMSetRenderTargets(0,nullptr,FALSE,&dsv);
+        m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+        m_commandList->SetPipelineState(m_vsmShadowPipelineState.Get());
+        ID3D12DescriptorHeap* heaps[] = {m_mainDescHeap.Get()}; m_commandList->SetDescriptorHeaps(1,heaps);
+        for (int shadowIndex=0; shadowIndex<spotShadowCount; ++shadowIndex) {
+            D3D12_VIEWPORT viewport={float(shadowIndex*1024),0,1024,1024,0,1};
+            D3D12_RECT scissor={LONG(shadowIndex*1024),0,LONG((shadowIndex+1)*1024),1024};
+            m_commandList->RSSetViewports(1,&viewport); m_commandList->RSSetScissorRects(1,&scissor);
+            if(m_vertexBuffer)m_commandList->SetGraphicsRootShaderResourceView(2,m_vertexBuffer->GetGPUVirtualAddress());
+            if(m_indexBuffer)m_commandList->SetGraphicsRootShaderResourceView(3,m_indexBuffer->GetGPUVirtualAddress());
+            if(m_meshletsBuffer)m_commandList->SetGraphicsRootShaderResourceView(4,m_meshletsBuffer->GetGPUVirtualAddress());
+            const EngineRender::ShadowFrustum frustum(m_constantBufferData.spotShadowViewProj[shadowIndex]);
+            for (size_t modelIndex=0; modelIndex<m_models.size(); ++modelIndex) {
+                const auto& model=m_models[modelIndex];
+                if (!model.visible || model.name=="Floor" || !model.indexCount ||
+                    !frustum.Intersects(model.position,localShadowRadii[modelIndex])) continue;
+                SceneConstantBuffer cb=m_constantBufferData;
+                cb.viewProj=m_constantBufferData.spotShadowViewProj[shadowIndex];
+                cb.model=XMMatrixScaling(model.scale.x,model.scale.y,model.scale.z) *
+                    XMMatrixRotationRollPitchYaw(XMConvertToRadians(model.rotation.x),XMConvertToRadians(model.rotation.y),XMConvertToRadians(model.rotation.z)) *
+                    XMMatrixTranslation(model.position.x,model.position.y,model.position.z);
+                cb.meshletStart=model.meshletStart; cb.meshletCount=model.meshletCount;
+                cb.baseVertexLocation=model.baseVertexLocation; cb.startIndexLocation=model.startIndexLocation;
+                UINT64 offset=UINT64(++currentCbIndex)*cbStride;
+                if (offset+sizeof(cb)>32*1024*1024) { LOG("Local shadow constant buffer exhausted"); return; }
+                memcpy(m_pCbvDataBegin+offset,&cb,sizeof(cb));
+                m_commandList->SetGraphicsRootConstantBufferView(0,m_constantBuffer->GetGPUVirtualAddress()+offset);
+                const UINT groups=(model.meshletCount+31)/32;
+                if(!DrawTessellated(model.material,model.indexCount,true,false))DrawGeometry(groups,model.indexCount);
+            }
+            for (const auto& model : m_dynamicModels) {
+                if (!model.visible || !model.indexCount || !model.vertexBuffer || !model.indexBuffer || !model.meshletBuffer) continue;
+                SceneConstantBuffer cb=m_constantBufferData;
+                cb.viewProj=m_constantBufferData.spotShadowViewProj[shadowIndex];
+                cb.model=XMMatrixScaling(model.scale.x,model.scale.y,model.scale.z) *
+                    XMMatrixRotationRollPitchYaw(XMConvertToRadians(model.rotation.x),XMConvertToRadians(model.rotation.y),XMConvertToRadians(model.rotation.z)) *
+                    XMMatrixTranslation(model.position.x,model.position.y,model.position.z);
+                cb.meshletStart=0; cb.meshletCount=model.meshletCount; cb.baseVertexLocation=0; cb.startIndexLocation=0;
+                UINT64 offset=UINT64(++currentCbIndex)*cbStride;
+                if (offset+sizeof(cb)>32*1024*1024) { LOG("Local shadow constant buffer exhausted"); return; }
+                memcpy(m_pCbvDataBegin+offset,&cb,sizeof(cb));
+                m_commandList->SetGraphicsRootConstantBufferView(0,m_constantBuffer->GetGPUVirtualAddress()+offset);
+                m_commandList->SetGraphicsRootShaderResourceView(2,model.vertexBuffer->GetGPUVirtualAddress());
+                m_commandList->SetGraphicsRootShaderResourceView(3,model.indexBuffer->GetGPUVirtualAddress());
+                m_commandList->SetGraphicsRootShaderResourceView(4,model.meshletBuffer->GetGPUVirtualAddress());
+                const UINT groups=(model.meshletCount+31)/32;
+                if(!DrawTessellated(model.material,model.indexCount,true,false))DrawGeometry(groups,model.indexCount);
+            }
+        }
+        if(m_vertexBuffer)m_commandList->SetGraphicsRootShaderResourceView(2,m_vertexBuffer->GetGPUVirtualAddress());
+        if(m_indexBuffer)m_commandList->SetGraphicsRootShaderResourceView(3,m_indexBuffer->GetGPUVirtualAddress());
+        if(m_meshletsBuffer)m_commandList->SetGraphicsRootShaderResourceView(4,m_meshletsBuffer->GetGPUVirtualAddress());
+        Transition(m_commandList.Get(),m_spotShadowMap.Get(),m_spotShadowState,D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    }
+
+    if (pointShadowCount > 0) {
+        Transition(m_commandList.Get(),m_pointShadowMap.Get(),m_pointShadowState,D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        auto dsv=m_dsvHeap->GetCPUDescriptorHandleForHeapStart();dsv.ptr+=3*m_dsvDescriptorSize;
+        m_commandList->ClearDepthStencilView(dsv,D3D12_CLEAR_FLAG_DEPTH,1.f,0,0,nullptr);
+        m_commandList->OMSetRenderTargets(0,nullptr,FALSE,&dsv);
+        m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());m_commandList->SetPipelineState(m_vsmShadowPipelineState.Get());
+        ID3D12DescriptorHeap* heaps[]={m_mainDescHeap.Get()};m_commandList->SetDescriptorHeaps(1,heaps);
+        for(int face=0;face<pointShadowCount*6;++face){
+            const int x=(face%3)*512,y=(face/3)*512;
+            D3D12_VIEWPORT viewport={float(x),float(y),512,512,0,1};
+            D3D12_RECT scissor={LONG(x),LONG(y),LONG(x+512),LONG(y+512)};
+            m_commandList->RSSetViewports(1,&viewport);m_commandList->RSSetScissorRects(1,&scissor);
+            if(m_vertexBuffer)m_commandList->SetGraphicsRootShaderResourceView(2,m_vertexBuffer->GetGPUVirtualAddress());
+            if(m_indexBuffer)m_commandList->SetGraphicsRootShaderResourceView(3,m_indexBuffer->GetGPUVirtualAddress());
+            if(m_meshletsBuffer)m_commandList->SetGraphicsRootShaderResourceView(4,m_meshletsBuffer->GetGPUVirtualAddress());
+            const EngineRender::ShadowFrustum frustum(m_constantBufferData.pointShadowViewProj[face]);
+            for (size_t modelIndex=0; modelIndex<m_models.size(); ++modelIndex) {
+                const auto& model=m_models[modelIndex];
+                if (!model.visible || model.name=="Floor" || !model.indexCount ||
+                    !frustum.Intersects(model.position,localShadowRadii[modelIndex])) continue;
+                SceneConstantBuffer cb=m_constantBufferData;
+                cb.viewProj=m_constantBufferData.pointShadowViewProj[face];
+                cb.model=XMMatrixScaling(model.scale.x,model.scale.y,model.scale.z) *
+                    XMMatrixRotationRollPitchYaw(XMConvertToRadians(model.rotation.x),XMConvertToRadians(model.rotation.y),XMConvertToRadians(model.rotation.z)) *
+                    XMMatrixTranslation(model.position.x,model.position.y,model.position.z);
+                cb.meshletStart=model.meshletStart; cb.meshletCount=model.meshletCount;
+                cb.baseVertexLocation=model.baseVertexLocation; cb.startIndexLocation=model.startIndexLocation;
+                UINT64 offset=UINT64(++currentCbIndex)*cbStride;
+                if (offset+sizeof(cb)>32*1024*1024) { LOG("Local shadow constant buffer exhausted"); return; }
+                memcpy(m_pCbvDataBegin+offset,&cb,sizeof(cb));
+                m_commandList->SetGraphicsRootConstantBufferView(0,m_constantBuffer->GetGPUVirtualAddress()+offset);
+                const UINT groups=(model.meshletCount+31)/32;
+                if(!DrawTessellated(model.material,model.indexCount,true,false))DrawGeometry(groups,model.indexCount);
+            }
+            for (const auto& model : m_dynamicModels) {
+                if (!model.visible || !model.indexCount || !model.vertexBuffer || !model.indexBuffer || !model.meshletBuffer) continue;
+                SceneConstantBuffer cb=m_constantBufferData;
+                cb.viewProj=m_constantBufferData.pointShadowViewProj[face];
+                cb.model=XMMatrixScaling(model.scale.x,model.scale.y,model.scale.z) *
+                    XMMatrixRotationRollPitchYaw(XMConvertToRadians(model.rotation.x),XMConvertToRadians(model.rotation.y),XMConvertToRadians(model.rotation.z)) *
+                    XMMatrixTranslation(model.position.x,model.position.y,model.position.z);
+                cb.meshletStart=0; cb.meshletCount=model.meshletCount; cb.baseVertexLocation=0; cb.startIndexLocation=0;
+                UINT64 offset=UINT64(++currentCbIndex)*cbStride;
+                if (offset+sizeof(cb)>32*1024*1024) { LOG("Local shadow constant buffer exhausted"); return; }
+                memcpy(m_pCbvDataBegin+offset,&cb,sizeof(cb));
+                m_commandList->SetGraphicsRootConstantBufferView(0,m_constantBuffer->GetGPUVirtualAddress()+offset);
+                m_commandList->SetGraphicsRootShaderResourceView(2,model.vertexBuffer->GetGPUVirtualAddress());
+                m_commandList->SetGraphicsRootShaderResourceView(3,model.indexBuffer->GetGPUVirtualAddress());
+                m_commandList->SetGraphicsRootShaderResourceView(4,model.meshletBuffer->GetGPUVirtualAddress());
+                const UINT groups=(model.meshletCount+31)/32;
+                if(!DrawTessellated(model.material,model.indexCount,true,false))DrawGeometry(groups,model.indexCount);
+            }
+        }
+        if(m_vertexBuffer)m_commandList->SetGraphicsRootShaderResourceView(2,m_vertexBuffer->GetGPUVirtualAddress());
+        if(m_indexBuffer)m_commandList->SetGraphicsRootShaderResourceView(3,m_indexBuffer->GetGPUVirtualAddress());
+        if(m_meshletsBuffer)m_commandList->SetGraphicsRootShaderResourceView(4,m_meshletsBuffer->GetGPUVirtualAddress());
+        Transition(m_commandList.Get(),m_pointShadowMap.Get(),m_pointShadowState,D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     }
 
     gpuStamp(3);
@@ -5602,7 +5809,7 @@ void Renderer::Render(float dt) {
 
         currentCbIndex++;
         UINT64 cbOffset = (UINT64)currentCbIndex * cbStride;
-        if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 1024 * 1024) {
+        if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 32 * 1024 * 1024) {
             memcpy(reinterpret_cast<UINT8*>(m_pCbvDataBegin) + cbOffset, &cbData, sizeof(SceneConstantBuffer));
         }
 
@@ -5666,7 +5873,7 @@ void Renderer::Render(float dt) {
 
         currentCbIndex++;
         UINT64 cbOffset = (UINT64)currentCbIndex * cbStride;
-        if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 1024 * 1024) {
+        if (m_pCbvDataBegin && cbOffset + sizeof(SceneConstantBuffer) <= 32 * 1024 * 1024) {
             memcpy(reinterpret_cast<UINT8*>(m_pCbvDataBegin) + cbOffset, &cbData, sizeof(SceneConstantBuffer));
         }
 
@@ -5862,15 +6069,8 @@ void Renderer::Render(float dt) {
         LOG("Skybox: DrawInstanced done");
     }
 
-    if (m_cloudGatherPipelineState) {
-        // Переключаемся на рендер-таргет для облаков (mboitMomentsTexture)
-        Transition(m_commandList.Get(), m_mboitMomentsTexture.Get(), m_mboitMomentsState, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        D3D12_CPU_DESCRIPTOR_HANDLE momentsRtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-        momentsRtvHandle.ptr += m_mboitMomentsRtvIndex * m_rtvDescriptorSize;
-        m_commandList->OMSetRenderTargets(1, &momentsRtvHandle, FALSE, nullptr);
-        const float clearZero[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        m_commandList->ClearRenderTargetView(momentsRtvHandle, clearZero, 0, nullptr);
-
+    if (m_cloudResolvePipelineState && m_pCloudCbvDataBegin &&
+        m_cloudDensity > 0.001f && m_constantBufferData.lightDir.y < 0.08f) {
         CloudConstants cloudData = {};
         float fov = XMConvertToRadians(m_fov);
         float aspect = (float)m_renderWidth / (float)m_renderHeight;
@@ -5883,20 +6083,6 @@ void Renderer::Render(float dt) {
         cloudData.cloudDensity = m_cloudDensity;
         if (m_pCloudCbvDataBegin) memcpy(m_pCloudCbvDataBegin, &cloudData, sizeof(CloudConstants));
 
-        m_commandList->SetPipelineState(m_cloudGatherPipelineState.Get());
-        m_commandList->SetGraphicsRootSignature(m_cloudGatherRootSignature.Get());
-        m_commandList->SetGraphicsRootConstantBufferView(0, m_cloudConstantBuffer->GetGPUVirtualAddress());
-
-        // Рисуем облака (gather)
-        m_commandList->DrawInstanced(3, 1, 0, 0);
-
-        // Возвращаем m_mboitMomentsTexture в состояние SRV
-        Transition(m_commandList.Get(), m_mboitMomentsTexture.Get(), m_mboitMomentsState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    }
-
-    if (m_mboitMomentsTexture) {
-        LOG("Render: Cloud Resolve Pass - mboitMomentsTexture OK");
-        
         D3D12_VIEWPORT cloudViewport = { 0.0f, 0.0f, static_cast<float>(m_renderWidth), static_cast<float>(m_renderHeight), 0.0f, 1.0f };
         D3D12_RECT cloudScissor = { 0, 0, m_renderWidth, m_renderHeight };
         m_commandList->RSSetViewports(1, &cloudViewport);
@@ -5908,11 +6094,6 @@ void Renderer::Render(float dt) {
         
         m_commandList->OMSetRenderTargets(1, &targetRtvHandle, FALSE, nullptr);
         LOG("Render: Cloud Resolve - OMSetRenderTargets OK");
-
-        D3D12_VIEWPORT cloudResolveViewport = { 0.0f, 0.0f, static_cast<float>(m_renderWidth), static_cast<float>(m_renderHeight), 0.0f, 1.0f };
-        D3D12_RECT cloudResolveScissor = { 0, 0, m_renderWidth, m_renderHeight };
-        m_commandList->RSSetViewports(1, &cloudResolveViewport);
-        m_commandList->RSSetScissorRects(1, &cloudResolveScissor);
 
         m_commandList->SetPipelineState(m_cloudResolvePipelineState.Get());
         LOG("Render: Cloud Resolve - SetPipelineState OK");
@@ -5928,10 +6109,6 @@ void Renderer::Render(float dt) {
         m_commandList->SetDescriptorHeaps(1, cloudResolveHeaps);
         LOG("Render: Cloud Resolve - SetDescriptorHeaps OK");
 
-        D3D12_GPU_DESCRIPTOR_HANDLE momentsSrvGpu = m_mainDescHeap->GetGPUDescriptorHandleForHeapStart();
-        momentsSrvGpu.ptr += m_mboitMomentsSrvIndex * m_cbvSrvDescriptorSize;
-        m_commandList->SetGraphicsRootDescriptorTable(1, momentsSrvGpu);
-
         D3D12_GPU_DESCRIPTOR_HANDLE depthSrvGpu = m_mainDescHeap->GetGPUDescriptorHandleForHeapStart();
         depthSrvGpu.ptr += m_depthSrvIndex * m_cbvSrvDescriptorSize;
         m_commandList->SetGraphicsRootDescriptorTable(2, depthSrvGpu);
@@ -5942,8 +6119,6 @@ void Renderer::Render(float dt) {
 
         Transition(m_commandList.Get(), m_depthStencilBuffer.Get(), m_depthStencilState, D3D12_RESOURCE_STATE_DEPTH_WRITE); // Depth back to write
         LOG("Render: Cloud Resolve - Depth back to write OK");
-    } else {
-        LOG("Render: Cloud Resolve Pass - SKIPPED (no mboitMomentsTexture)");
     }
     LOG("Render: Cloud Pass done");
 
@@ -6145,8 +6320,9 @@ void Renderer::Render(float dt) {
         LOG("Render: Composite - setting CBV at slot 0");
         SceneConstantBuffer compositeConstants=m_constantBufferData;
         compositeConstants.model=XMMatrixInverse(nullptr,m_viewProj);
+        compositeConstants.padLights2=(m_ssgiEnabled && m_ssgiIntensity>0 && (rasterGI || (m_dxrEnabled && m_dxrDevice && !m_pathTracingEnabled))) ? 1.f : 0.f;
         const UINT64 compositeOffset=UINT64(++currentCbIndex)*cbStride;
-        if(compositeOffset+sizeof(compositeConstants)>1024*1024){LOG("Composite constant buffer exhausted");return;}
+        if(compositeOffset+sizeof(compositeConstants)>32*1024*1024){LOG("Composite constant buffer exhausted");return;}
         memcpy(m_pCbvDataBegin+compositeOffset,&compositeConstants,sizeof(compositeConstants));
         m_commandList->SetGraphicsRootConstantBufferView(0,m_constantBuffer->GetGPUVirtualAddress()+compositeOffset);
         LOG("Render: Composite - CBV OK");
@@ -6240,6 +6416,8 @@ void Renderer::Render(float dt) {
     m_dlssActive = false;
     bool upscalingSuccess = false;
     if (m_dlssSupported && m_upscaleTechnique == UpscaleTechnique::DLSS) {
+        if (m_compositedColorTexture)
+            Transition(m_commandList.Get(), m_compositedColorTexture.Get(), m_compositedColorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         Transition(m_commandList.Get(), m_sceneColorTexture.Get(), m_sceneColorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         Transition(m_commandList.Get(), m_velocityTexture.Get(), m_velocityState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         Transition(m_commandList.Get(), m_normalTexture.Get(), m_normalState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -6330,13 +6508,15 @@ void Renderer::Render(float dt) {
                 sl::ResourceTag(&depthRes, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent),
                 sl::ResourceTag(&mvecRes, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilEvaluate, &inputExtent)
             };
-            slSetTagForFrame(*frameToken, vHandle, tags, _countof(tags), m_commandList.Get());
+            sl::Result tagResult = slSetTagForFrame(*frameToken, vHandle, tags, _countof(tags), m_commandList.Get());
+            sl::Result guideResult = sl::Result::eOk;
             if(rrRequested){
                 Transition(m_commandList.Get(),m_rrDiffuseAlbedo.Get(),m_rrDiffuseState,D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);Transition(m_commandList.Get(),m_rrSpecularAlbedo.Get(),m_rrSpecularState,D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);Transition(m_commandList.Get(),m_normalTexture.Get(),m_normalState,D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);Transition(m_commandList.Get(),m_rrHitDistance.Get(),m_rrHitDistanceState,D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
                 sl::Resource diffuse{sl::ResourceType::eTex2d,m_rrDiffuseAlbedo.Get(),D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},specular{sl::ResourceType::eTex2d,m_rrSpecularAlbedo.Get(),D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},normal{sl::ResourceType::eTex2d,m_normalTexture.Get(),D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},distance{sl::ResourceType::eTex2d,m_rrHitDistance.Get(),D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE};
-                sl::ResourceTag guides[]={{&diffuse,sl::kBufferTypeAlbedo,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent},{&specular,sl::kBufferTypeSpecularAlbedo,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent},{&normal,sl::kBufferTypeNormalRoughness,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent},{&distance,sl::kBufferTypeSpecularHitDistance,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent}};slSetTagForFrame(*frameToken,vHandle,guides,4,m_commandList.Get());
+                sl::ResourceTag guides[]={{&diffuse,sl::kBufferTypeAlbedo,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent},{&specular,sl::kBufferTypeSpecularAlbedo,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent},{&normal,sl::kBufferTypeNormalRoughness,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent},{&distance,sl::kBufferTypeSpecularHitDistance,sl::ResourceLifecycle::eValidUntilEvaluate,&inputExtent}};guideResult=slSetTagForFrame(*frameToken,vHandle,guides,4,m_commandList.Get());
             }
-            slDLSSSetOptions(vHandle, dlssOpts);
+            sl::Result dlssOptionResult = slDLSSSetOptions(vHandle, dlssOpts);
+            sl::Result rrOptionResult = sl::Result::eOk;
             if (m_dlssRRSupported) {
                 sl::DLSSDOptions dlssdOpts = {};
                 dlssdOpts.mode = rrRequested ? dlssOpts.mode : sl::DLSSMode::eOff;
@@ -6367,16 +6547,26 @@ void Renderer::Render(float dt) {
                     memcpy(&dlssdOpts.cameraViewToWorld, &invViewMat, sizeof(sl::float4x4));
                 }
 
-                slDLSSDSetOptions(vHandle, dlssdOpts);
+                rrOptionResult = slDLSSDSetOptions(vHandle, dlssdOpts);
             }
-            slSetConstants(slConsts, *frameToken, vHandle);
+            sl::Result constantsResult = slSetConstants(slConsts, *frameToken, vHandle);
             sl::Feature featureToEval = rrRequested ? sl::kFeatureDLSS_RR : sl::kFeatureDLSS;
             const sl::BaseStructure* inputs[] = { 
                 static_cast<const sl::BaseStructure*>(&vHandle),
                 static_cast<const sl::BaseStructure*>(&dlssOpts)
             };
-            sl::Result res = slEvaluateFeature(featureToEval, *frameToken, inputs, rrRequested?1:_countof(inputs), m_commandList.Get());
+            sl::Result res = tagResult;
+            if (res == sl::Result::eOk) res = constantsResult;
+            if (res == sl::Result::eOk) res = rrRequested ? guideResult : dlssOptionResult;
+            if (res == sl::Result::eOk && rrRequested) res = rrOptionResult;
+            if (res == sl::Result::eOk)
+                res = slEvaluateFeature(featureToEval, *frameToken, inputs, rrRequested?1:_countof(inputs), m_commandList.Get());
             m_dlssRRActive=rrRequested&&res==sl::Result::eOk;
+            if (rrRequested && res != sl::Result::eOk && tagResult == sl::Result::eOk &&
+                constantsResult == sl::Result::eOk && dlssOptionResult == sl::Result::eOk) {
+                LOG("DLSS RR setup/evaluation failed: " << (int)res << "; falling back to DLSS SR");
+                res = slEvaluateFeature(sl::kFeatureDLSS, *frameToken, inputs, _countof(inputs), m_commandList.Get());
+            }
             if (res == sl::Result::eOk) {
                 upscalingSuccess = true;
                 m_dlssActive = true;
@@ -6391,25 +6581,17 @@ void Renderer::Render(float dt) {
         }
     } else if (m_upscaleTechnique == UpscaleTechnique::FSR) {
         if (m_framesAfterResize == 0) {
-            bool hasComposited = ((m_ssaoEnabled || m_ssgiEnabled || (m_dxrEnabled && m_dxrDevice)) && m_compositedColorTexture);
-            ID3D12Resource* fsrInputColor = hasComposited ? m_compositedColorTexture.Get() : m_sceneColorTexture.Get();
-            D3D12_RESOURCE_STATES& fsrInputState = hasComposited ? m_compositedColorState : m_sceneColorState;
-
-            Transition(m_commandList.Get(), fsrInputColor, fsrInputState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            Transition(m_commandList.Get(), m_upscaledColorTexture.Get(), m_upscaledColorState, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-            upscalingSuccess=ApplyFSR2(m_commandList.Get());
+            upscalingSuccess = ApplyFSR2(m_commandList.Get());
 
             Transition(m_commandList.Get(), m_upscaledColorTexture.Get(), m_upscaledColorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-            upscalingSuccess = m_fsrActive;
         }
     } else if(m_upscaleTechnique==UpscaleTechnique::XeSS){
         ApplyXeSS(m_commandList.Get());upscalingSuccess=m_xessActive;
         Transition(m_commandList.Get(),m_upscaledColorTexture.Get(),m_upscaledColorState,D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     } else {
         // Standalone TAA pass
-        if (m_taaEnabled) {
+        if (m_taaEnabled && m_taaPipelineState && m_taaRootSignature && m_historyColorTexture && m_upscaledColorTexture) {
             bool composite=(m_ssaoEnabled||m_ssgiEnabled||(m_dxrEnabled&&m_dxrDevice))&&m_compositedColorTexture;
             auto* color=composite?m_compositedColorTexture.Get():m_sceneColorTexture.Get();auto& state=composite?m_compositedColorState:m_sceneColorState;
             if(!m_taaHistoryValid){Transition(m_commandList.Get(),color,state,D3D12_RESOURCE_STATE_COPY_SOURCE);Transition(m_commandList.Get(),m_historyColorTexture.Get(),m_historyColorState,D3D12_RESOURCE_STATE_COPY_DEST);m_commandList->CopyResource(m_historyColorTexture.Get(),color);}
@@ -6521,15 +6703,12 @@ void Renderer::Render(float dt) {
         Transition(m_commandList.Get(), m_upscaledColorTexture.Get(), m_upscaledColorState, D3D12_RESOURCE_STATE_RENDER_TARGET);
     }
 
-#ifndef ENGINE_RELEASE
     if (m_imguiInitialized) {
         ImGui::Render();
         ID3D12DescriptorHeap* ppImGuiHeaps[] = { m_imguiSrvHeap.Get() };
         m_commandList->SetDescriptorHeaps(1, ppImGuiHeaps);
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
     }
-#endif
-
     TagDLSSGFrame(dt);
     gpuStamp(11);
     D3D12_RESOURCE_BARRIER presentBarrier = {};
@@ -6673,13 +6852,11 @@ void Renderer::LogD3D12Messages() {
 
 
 void Renderer::BeginUI() {
-#ifndef ENGINE_RELEASE
     if (m_imguiInitialized) {
         ImGui_ImplDX12_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
     }
-#endif
 }
 
 void Renderer::Destroy() {
@@ -6708,6 +6885,9 @@ void Renderer::Destroy() {
     
     ShutdownFSR2();
 
+    if (m_dxrSystem) {
+        m_dxrSystem->Shutdown();
+    }
     if (m_dxrDevice) {
         m_dxrDevice.Reset();
         m_dxrCommandList.Reset();
@@ -6722,14 +6902,12 @@ void Renderer::Destroy() {
 
     WaitForPreviousFrame();
 
-#ifndef ENGINE_RELEASE
     if (m_imguiInitialized) {
         ImGui_ImplDX12_Shutdown();
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
         m_imguiInitialized = false;
     }
-#endif
 
     if (m_fenceEvent) {
         CloseHandle(m_fenceEvent);
@@ -6777,7 +6955,19 @@ void Renderer::SpawnTriangle(const XMFLOAT3& pos) {
 }
 
 void Renderer::SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos) {
-    if (!m_device) return;
+    LoadDynamicRenderModel(filepath, pos, nullptr);
+}
+
+bool Renderer::ReimportDynamicModel(uint32_t modelId) {
+    for (auto& model : m_dynamicModels) {
+        if (model.modelId == modelId && !model.filepath.empty())
+            return LoadDynamicRenderModel(model.filepath.c_str(), model.position, &model);
+    }
+    return false;
+}
+
+bool Renderer::LoadDynamicRenderModel(const char* filepath, const XMFLOAT3& pos, RenderDynamicModel* existing) {
+    if (!m_device || m_deviceRemoved) return false;
 
     std::vector<Renderer::Vertex> verts;
     std::vector<uint32_t> idx;
@@ -6793,7 +6983,15 @@ void Renderer::SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos
     }
     std::replace(wpath.begin(), wpath.end(), L'\\', L'/');
 
-    auto pakData = LoadFromPak(wpath);
+    std::vector<uint8_t> pakData;
+    std::error_code sourceError;
+    const bool sourceAvailable = std::filesystem::is_regular_file(fp, sourceError);
+    if (existing && !sourceAvailable) return false;
+#if defined(ENGINE_EDITOR)
+    if (!sourceAvailable) pakData = LoadFromPak(wpath);
+#else
+    if (!existing) pakData = LoadFromPak(wpath);
+#endif
     bool loadSuccess = false;
 
     if (ext == ".obj") {
@@ -6855,64 +7053,42 @@ void Renderer::SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos
         }
 
         if (result == cgltf_result_success) {
-            cgltf_load_buffers(&options, data, filepath);
+            const std::unique_ptr<cgltf_data, decltype(&cgltf_free)> document(data, cgltf_free);
+            if (cgltf_load_buffers(&options, data, filepath) != cgltf_result_success ||
+                cgltf_validate(data) != cgltf_result_success) return false;
+
             for (size_t i = 0; i < data->meshes_count; ++i) {
-                const cgltf_mesh& mesh = data->meshes[i];
+                const auto& mesh = data->meshes[i];
                 for (size_t p = 0; p < mesh.primitives_count; ++p) {
-                    const cgltf_primitive& prim = mesh.primitives[p];
-                    
-                    size_t vCount = 0;
-                    const float* posData = nullptr;
-                    const float* normData = nullptr;
-                    const float* uvData = nullptr;
-                    
-                    for (size_t a = 0; a < prim.attributes_count; ++a) {
-                        const cgltf_attribute& attr = prim.attributes[a];
-                        if (attr.type == cgltf_attribute_type_position) {
-                            vCount = attr.data->count;
-                            posData = (const float*)((const uint8_t*)attr.data->buffer_view->buffer->data + attr.data->buffer_view->offset + attr.data->offset);
-                        } else if (attr.type == cgltf_attribute_type_normal) {
-                            normData = (const float*)((const uint8_t*)attr.data->buffer_view->buffer->data + attr.data->buffer_view->offset + attr.data->offset);
-                        } else if (attr.type == cgltf_attribute_type_texcoord) {
-                            uvData = (const float*)((const uint8_t*)attr.data->buffer_view->buffer->data + attr.data->buffer_view->offset + attr.data->offset);
-                        }
+                    const auto& primitive = mesh.primitives[p];
+                    if (primitive.type != cgltf_primitive_type_triangles) continue;
+                    const auto* positions = cgltf_find_accessor(&primitive, cgltf_attribute_type_position, 0);
+                    const auto* normals = cgltf_find_accessor(&primitive, cgltf_attribute_type_normal, 0);
+                    const auto* texcoords = cgltf_find_accessor(&primitive, cgltf_attribute_type_texcoord, 0);
+                    if (!positions || positions->count > UINT_MAX / sizeof(Vertex) - verts.size()) return false;
+                    const auto baseVertex = static_cast<uint32_t>(verts.size());
+                    for (size_t v = 0; v < positions->count; ++v) {
+                        float position[3]{};
+                        float normal[3]{0.f, 1.f, 0.f};
+                        float uv[2]{};
+                        if (!cgltf_accessor_read_float(positions, v, position, 3) ||
+                            (normals && !cgltf_accessor_read_float(normals, v, normal, 3)) ||
+                            (texcoords && !cgltf_accessor_read_float(texcoords, v, uv, 2))) return false;
+                        Vertex vertex{};
+                        vertex.position = {position[0], position[1], position[2]};
+                        vertex.normal = {normal[0], normal[1], normal[2]};
+                        vertex.color = {1.f, 1.f, uv[0], uv[1]};
+                        verts.push_back(vertex);
                     }
-
-                    size_t startIndex = verts.size();
-                    for (size_t v = 0; v < vCount; ++v) {
-                        Renderer::Vertex vert{};
-                        vert.position = {posData[v*3+0], posData[v*3+1], posData[v*3+2]};
-                        if (normData) {
-                            vert.normal = {normData[v*3+0], normData[v*3+1], normData[v*3+2]};
-                        } else {
-                            vert.normal = {0, 1, 0};
-                        }
-                        if (uvData) {
-                            vert.color = {1.0f, 1.0f, uvData[v*2+0], uvData[v*2+1]};
-                        } else {
-                            vert.color = {1.0f, 1.0f, 0.0f, 0.0f};
-                        }
-                        verts.push_back(vert);
-                    }
-
-                    if (prim.indices) {
-                        const cgltf_accessor* indAcc = prim.indices;
-                        const uint8_t* indBuffer = (const uint8_t*)indAcc->buffer_view->buffer->data + indAcc->buffer_view->offset + indAcc->offset;
-                        for (size_t id = 0; id < indAcc->count; ++id) {
-                            if (indAcc->component_type == cgltf_component_type_r_16u) {
-                                idx.push_back((uint32_t)((const uint16_t*)indBuffer)[id] + startIndex);
-                            } else if (indAcc->component_type == cgltf_component_type_r_32u) {
-                                idx.push_back(((const uint32_t*)indBuffer)[id] + startIndex);
-                            }
-                        }
-                    } else {
-                        for (size_t v = 0; v < vCount; ++v) {
-                            idx.push_back((uint32_t)(startIndex + v));
-                        }
+                    const size_t count = primitive.indices ? primitive.indices->count : positions->count;
+                    if (count % 3 != 0 || count > UINT_MAX / sizeof(uint32_t) - idx.size()) return false;
+                    for (size_t j = 0; j < count; ++j) {
+                        const size_t index = primitive.indices ? cgltf_accessor_read_index(primitive.indices, j) : j;
+                        if (index >= positions->count) return false;
+                        idx.push_back(baseVertex + static_cast<uint32_t>(index));
                     }
                 }
             }
-            cgltf_free(data);
             loadSuccess = true;
         } else {
             LOG("Renderer: Failed to load GLTF/GLB (" << filepath << ")");
@@ -6965,13 +7141,15 @@ void Renderer::SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos
             ufbx_free_scene(scene);
             loadSuccess = true;
         } else {
-            MessageBoxA(nullptr, "Failed to load FBX", "Error", MB_OK);
+            if (!existing) MessageBoxA(nullptr, "Failed to load FBX", "Error", MB_OK);
         }
     } else {
-        MessageBoxA(nullptr, "Unsupported model format (Only .obj, .gltf, .glb, .fbx supported)", "Error", MB_OK);
+        if (!existing) MessageBoxA(nullptr, "Unsupported model format (Only .obj, .gltf, .glb, .fbx supported)", "Error", MB_OK);
     }
 
-    if (!loadSuccess || verts.empty() || idx.empty()) return;
+    if (!loadSuccess || verts.empty() || idx.empty() || idx.size() % 3 != 0 ||
+        verts.size() > UINT_MAX / sizeof(Vertex) || idx.size() > UINT_MAX / sizeof(uint32_t) ||
+        std::any_of(idx.begin(), idx.end(), [&](uint32_t index) { return index >= verts.size(); })) return false;
 
     RenderDynamicModel dm;
     dm.name = fp.filename().string();
@@ -6999,14 +7177,14 @@ void Renderer::SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos
 
     if (FAILED(m_device->CreateCommittedResource(
         &m_heapPropsUpload, D3D12_HEAP_FLAG_NONE, &vbDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dm.vertexBuffer)))) return;
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dm.vertexBuffer)))) return false;
 
     UINT8* pVertexDataBegin;
     D3D12_RANGE readRange = {0, 0};
     if (SUCCEEDED(dm.vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)))) {
         memcpy(pVertexDataBegin, verts.data(), vertexBufferSize);
         dm.vertexBuffer->Unmap(0, nullptr);
-    }
+    } else return false;
 
     dm.vertexBufferView.BufferLocation = dm.vertexBuffer->GetGPUVirtualAddress();
     dm.vertexBufferView.StrideInBytes = sizeof(Renderer::Vertex);
@@ -7022,13 +7200,13 @@ void Renderer::SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos
 
     if (FAILED(m_device->CreateCommittedResource(
         &m_heapPropsUpload, D3D12_HEAP_FLAG_NONE, &ibDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dm.indexBuffer)))) return;
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&dm.indexBuffer)))) return false;
 
     UINT8* pIndexDataBegin;
     if (SUCCEEDED(dm.indexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pIndexDataBegin)))) {
         memcpy(pIndexDataBegin, idx.data(), indexBufferSize);
         dm.indexBuffer->Unmap(0, nullptr);
-    }
+    } else return false;
 
     dm.indexBufferView.BufferLocation = dm.indexBuffer->GetGPUVirtualAddress();
     dm.indexBufferView.Format = DXGI_FORMAT_R32_UINT;
@@ -7039,8 +7217,33 @@ void Renderer::SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos
     dm.meshletCount = (UINT)meshlets.size();
     dm.meshletBuffer = CreateStructuredBuffer(dm.meshletCount, sizeof(Renderer::Meshlet), meshlets.data());
 
-    m_dynamicModels.push_back(std::move(dm));
-    m_rtSceneDirty = true; // Trigger BLAS/TLAS rebuild next frame for the new model
+    if (dm.meshletCount && !dm.meshletBuffer) return false;
+
+    dm.collisionMesh.vertices.reserve(verts.size());
+    for (const auto& vertex : verts) dm.collisionMesh.vertices.push_back(vertex.position);
+    dm.collisionMesh.indices = std::move(idx);
+    if (existing) {
+        for (const auto& resource : {existing->vertexBuffer, existing->indexBuffer, existing->meshletBuffer,
+                                    existing->blas, existing->blasScratch}) {
+            if (resource) m_retiredResources.push_back(resource);
+        }
+        existing->vertexBuffer = std::move(dm.vertexBuffer);
+        existing->vertexBufferView = dm.vertexBufferView;
+        existing->indexBuffer = std::move(dm.indexBuffer);
+        existing->indexBufferView = dm.indexBufferView;
+        existing->indexCount = dm.indexCount;
+        existing->startIndexLocation = 0;
+        existing->baseVertexLocation = 0;
+        existing->meshletBuffer = std::move(dm.meshletBuffer);
+        existing->meshletCount = dm.meshletCount;
+        existing->collisionMesh = std::move(dm.collisionMesh);
+        existing->blas.Reset();
+        existing->blasScratch.Reset();
+    } else {
+        m_dynamicModels.push_back(std::move(dm));
+    }
+    InvalidateRaytracingScene();
+    return true;
 }
 
 uint32_t Renderer::CreateDynamicClothModel(const std::string& name, const std::vector<Renderer::Vertex>& vertices, const std::vector<uint32_t>& indices, const PBRMaterial& material) {

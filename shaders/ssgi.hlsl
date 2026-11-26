@@ -25,8 +25,8 @@ void CSMain(uint3 id:SV_DispatchThreadID){
     float3 tangent=normalize(cross(abs(normal.z)<.99f?float3(0,0,1):float3(0,1,0),normal));
     float3 bitangent=cross(normal,tangent),incoming=0;
     float rotation=Random(id.xy)*6.2831853f;
-    [unroll]for(int sample=0;sample<2;++sample){
-        float r=(sample+.5f)/2.f,phi=rotation+sample*2.3999632f;
+    [unroll]for(int sample=0;sample<8;++sample){
+        float r=(sample+.5f)/8.f,phi=rotation+sample*2.3999632f;
         float3 direction=tangent*(cos(phi)*sqrt(r))+bitangent*(sin(phi)*sqrt(r))+normal*sqrt(1-r);
         float previousDistance=RayStepSize;
         [loop]for(int step=0;step<RaySteps;++step){
@@ -62,10 +62,10 @@ void CSMain(uint3 id:SV_DispatchThreadID){
             if(dot(hitNormal,hitNormal)<.1f)break;
             float facing=saturate(dot(-direction,normalize(hitNormal)));
             float edge=saturate(min(min(sampleUV.x,1-sampleUV.x),min(sampleUV.y,1-sampleUV.y))*20);
-            incoming+=max(g_RadianceTex.SampleLevel(g_Sampler,sampleUV,0).rgb,0)*facing*edge;
+            incoming+=min(max(g_RadianceTex.SampleLevel(g_Sampler,sampleUV,0).rgb,0),2.f)*facing*edge;
             break;
         }
     }
-    float3 result=diffuse*(incoming*.5f)*Intensity;
+    float3 result=diffuse*(incoming/8.f)*Intensity;
     g_OutputTex[id.xy]=float4(all(isfinite(result))?min(result,8.f):0,1);
 }

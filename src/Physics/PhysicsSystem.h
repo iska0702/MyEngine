@@ -131,6 +131,7 @@ public:
     void SetVehicleGear(uint32_t id,int gear);
     float VehicleSpeed(uint32_t id) const {auto i=m_vehicles.find(id);return i==m_vehicles.end()?0:i->second.speed;}
     bool IsDriving() const { return m_drivenVehicle!=0; }
+    float DrivenVehicleSpeed() const { return VehicleSpeed(m_drivenVehicle); }
     void SetVehicleInput(uint32_t id,float throttle,float steer,float brake,bool handbrake=false);
     void ResetVehicleRoadAI(uint32_t id) { auto i=m_vehicles.find(id); if(i!=m_vehicles.end()) i->second.road={}; }
     void StepVehicles(float dt,Renderer* renderer);

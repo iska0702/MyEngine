@@ -198,5 +198,7 @@ float4 PSMain(VertexOut pin) : SV_Target {
 
     // 7. Gamma Correction (sRGB)
     float3 finalColor = pow(max(mapped, 0.0f), float3(1.0f / 2.2f, 1.0f / 2.2f, 1.0f / 2.2f));
-    return float4(saturate(finalColor), 1.0f);
+    // Decorrelate 8-bit quantisation in smooth, dark gradients.
+    float dither = (InterleavedGradientNoise(pin.PosH.xy) - 0.5f) / 255.0f;
+    return float4(saturate(finalColor + dither), 1.0f);
 }

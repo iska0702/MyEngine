@@ -27,6 +27,9 @@
 #include "Application.h"
 #include "DiagnosticPaths.h"
 #include "UI/AntiAliasingControls.h"
+#if defined(_WIN32) && !defined(ENGINE_RELEASE)
+#include "UI/GraphicsAutoTune.h"
+#endif
 #include "Window.h"
 #include "Renderer.h"
 #if defined(_WIN32) && defined(ENGINE_EDITOR)
@@ -52,6 +55,9 @@ static bool s_showVRDiagnostics = false;
 #include "Renderer/CameraDocument.h"
 #include "Scene/GameplayRuntime.h"
 #include "UI/GameplayInspector.h"
+#if defined(_WIN32) || !defined(ENGINE_RELEASE)
+#include "UI/ProjectHUD.h"
+#endif
 #include "UI/PrefabInspector.h"
 #include "UI/MaterialPreview.h"
 #include "Asset/MaterialAsset.h"
@@ -93,6 +99,7 @@ static bool s_showVRDiagnostics = false;
 #include <sstream>
 #include <filesystem>
 #include <chrono>
+#include <thread>
 #include <type_traits>
 
 Application::Application(int width, int height, const std::wstring& title)
@@ -262,10 +269,13 @@ std::string Application::CaptureScene() {
     EnginePostProcess::WritePostProcessState(file,post.GetGlobalSettings(),post.GetVolumes());
     file<<"GRAPHICS_PIPELINE "<<m_renderer->m_dxrEnabled<<' '<<m_renderer->m_rtShadowsEnabled<<' '<<m_renderer->m_rtReflectionsEnabled<<' '
         <<m_renderer->IsPathTracingEnabled()<<' '<<static_cast<int>(m_renderer->GetUpscaleTechnique())<<' '<<static_cast<int>(m_renderer->GetUpscaleQuality())<<' '
-        <<m_renderer->IsVSyncEnabled()<<' '<<m_renderer->IsTAAEnabled()<<'\n';
+        <<m_renderer->IsVSyncEnabled()<<' '<<m_renderer->IsTAAEnabled()<<' '
+        <<m_dynamicResolutionEnabled<<' '<<m_targetFps<<' '<<m_minimumRenderScale<<' '<<m_limitFrameRate<<'\n';
     file << "GRAPHICS_FEATURES " << m_renderer->IsSSAOEnabled() << " " << m_renderer->IsSSGIEnabled() << " " << m_renderer->IsVSMEnabled() << " " << m_renderer->IsVolumetricFogEnabled() << " " << m_renderer->GetVolumetricFogDensity() << " " << m_renderer->GetCloudDensity() << " " << m_renderer->GetFOV() << "\n";
+    file << "WORLD_TIME " << m_worldClockEnabled << " " << m_worldClockRunning << " " << m_worldMinutes << "\n";
     file << "DLSS_RR " << static_cast<int>(m_renderer->GetDLSSRayReconstructionVersion()) << "\n";
     file << "GI_INTENSITY " << m_renderer->GetSSGIIntensity() << "\n";
+    file << "PATH_TRACING_SAMPLES " << m_renderer->GetPathTracingSamples() << "\n";
     auto& models = m_renderer->GetModels();
     for (const auto& model : models) {
         file << "MODEL " << model.name << "\n";
@@ -425,7 +435,13 @@ void Application::LoadScene() {
 
 void Application::ApplyScene(const std::string& sceneData) {
     if(m_gameplay)m_gameplay->Clear();
+    m_dynamicResolutionEnabled = false;
+    m_targetFps = 60;
+    m_minimumRenderScale = 50;
+    m_limitFrameRate = false;
     if (sceneData.empty()) return;
+    m_worldClockEnabled = false;
+    m_worldClockRunning = false;
 
     std::string line;
     m_renderer->SynchronizeForUpdate();
@@ -485,6 +501,14 @@ void Application::ApplyScene(const std::string& sceneData) {
                 m_renderer->SetUpscaleTechnique(static_cast<UpscaleTechnique>((std::clamp)(technique,0,3)));
                 m_renderer->SetUpscaleQuality(static_cast<UpscaleQuality>((std::clamp)(quality,0,4)));
                 m_renderer->SetVSyncEnabled(vsync);m_renderer->SetTAAEnabled(taa);
+                bool dynamicResolution, limit;
+                int target, minimum;
+                if (iss >> dynamicResolution >> target >> minimum >> limit) {
+                    m_dynamicResolutionEnabled = dynamicResolution;
+                    m_targetFps = (std::clamp)(target, 30, 360);
+                    m_minimumRenderScale = (std::clamp)(minimum, 50, 100);
+                    m_limitFrameRate = limit;
+                }
             }
             continue;
         }
@@ -497,7 +521,20 @@ void Application::ApplyScene(const std::string& sceneData) {
             }
             continue;
         }
+        if (tag == "WORLD_TIME") {
+            bool enabled = false, running = false;
+            double minutes = 720.0;
+            if (iss >> enabled >> running >> minutes && std::isfinite(minutes)) {
+                m_worldClockEnabled = enabled;
+                m_worldClockRunning = enabled && running;
+                m_worldMinutes = std::fmod((std::max)(0.0, minutes), 1440.0);
+                m_worldTimeHour = static_cast<int>(m_worldMinutes) / 60;
+                m_worldTimeMinute = static_cast<int>(m_worldMinutes) % 60;
+            }
+            continue;
+        }
         if(tag=="DLSS_RR"){int preset=0;if(iss>>preset)m_renderer->SetDLSSRayReconstructionVersion(static_cast<Renderer::DLSSRRVersion>(preset));continue;}
+        if (tag == "PATH_TRACING_SAMPLES") { int samples = 1; if (iss >> samples) m_renderer->SetPathTracingSamples(samples); continue; }
         if(tag=="GI_INTENSITY"){float intensity=1;if(iss>>intensity)m_renderer->SetSSGIIntensity(intensity);continue;}
         if (tag == "WORLD_LAYOUT") {
             int revision = 0;
@@ -886,6 +923,9 @@ bool Application::Initialize() {
 }
 
 int Application::Run() {
+#if defined(_WIN32) && !defined(ENGINE_RELEASE)
+    EngineUI::GraphicsAutoTune graphicsAutoTune;
+#endif
     std::cout << "[Idontknow PS4] Application::Run entered! Starting main render loop..." << std::endl;
     Timer timer;
     unsigned benchmarkFrames = 0;
@@ -945,9 +985,17 @@ int Application::Run() {
             m_renderer->SetTAAEnabled(false);
         }
         if (m_benchmarkPathTracing) m_renderer->SetPathTracingEnabled(true);
+#if defined(_WIN32)
+        if (m_benchmarkPathTracing) {
+            wchar_t value[16] = {};
+            if (GetEnvironmentVariableW(L"IDK_BENCHMARK_PT_SAMPLES", value, 16))
+                m_renderer->SetPathTracingSamples(_wtoi(value));
+        }
+#endif
         if(m_benchmarkFSRFG)m_renderer->SetFSRFrameGenEnabled(true);
         if(m_benchmarkXeFG)m_renderer->SetXeSSFrameGenEnabled(true);
         if(m_benchmarkRR){EngineUI::ApplyAntiAliasing(*m_renderer,2);m_renderer->SetDLSSRayReconstructionActive(true);}
+        if(m_benchmarkNoRR){EngineUI::ApplyAntiAliasing(*m_renderer,2);m_renderer->SetDLSSRayReconstructionActive(false);}
         if(m_benchmarkLatency==0){m_renderer->SetReflexMode(ReflexMode::Off);m_renderer->SetXeLLEnabled(false);}
         if(m_benchmarkLatency==1)m_renderer->SetReflexMode(ReflexMode::LowLatency);
         if(m_benchmarkLatency==2)m_renderer->SetXeLLEnabled(true);
@@ -965,6 +1013,31 @@ int Application::Run() {
             }
         }
     }
+#if defined(_WIN32)
+    if (m_benchmarkFrameLimit && GetEnvironmentVariableW(L"IDK_BENCHMARK_SPOT_FIXTURE", nullptr, 0) > 0) {
+        for (auto& model : m_renderer->GetModels()) model.visible = false;
+        for (auto& model : m_renderer->GetDynamicModels()) model.visible = false;
+        m_renderer->GetPointLights().clear(); m_renderer->GetSpotLights().clear();
+        m_renderer->SpawnPlane({0,0,0}); auto& floor = m_renderer->GetModels().back();
+        floor.name = "Shadow fixture floor"; floor.scale = {20,1,20}; floor.material.albedo = {.7f,.7f,.7f};
+        m_renderer->SpawnCube({0,1,0}); auto& blocker = m_renderer->GetModels().back();
+        blocker.name = "Shadow fixture blocker"; blocker.scale = {2,2,.4f}; blocker.material.albedo = {.4f,.4f,.4f};
+        if (GetEnvironmentVariableW(L"IDK_BENCHMARK_POINT_FIXTURE", nullptr, 0) > 0) {
+            Renderer::PointLight light; light.name="Shadow fixture point light"; light.position={0,3,-4};
+            light.intensity=150; light.range=25; m_renderer->GetPointLights().push_back(light);
+            if (GetEnvironmentVariableW(L"IDK_BENCHMARK_TWO_POINT_FIXTURE", nullptr, 0) > 0) {
+                light.name="Shadow fixture second point light"; light.position={3,3,-4};
+                m_renderer->GetPointLights().push_back(light);
+            }
+        } else {
+            Renderer::SpotLight light; light.name="Shadow fixture spotlight"; light.position={0,3,-4};
+            light.direction={0,-.32f,1}; light.intensity=150; light.range=25; light.innerAngle=20; light.outerAngle=40;
+            m_renderer->GetSpotLights().push_back(light);
+        }
+        m_renderer->SetCloudDensity(0); m_renderer->SetLightColor({.01f,.01f,.01f});
+        m_worldClockEnabled = false; m_worldClockRunning = false;
+    }
+#endif
     if(m_benchmarkFrameLimit&&m_benchmarkTessellation){
         for(auto& model:m_renderer->GetModels()){model.material.tessellation.enabled=true;model.material.tessellation.factor=8;model.material.tessellation.smoothing=1;}
         for(auto& model:m_renderer->GetDynamicModels()){model.material.tessellation.enabled=true;model.material.tessellation.factor=8;model.material.tessellation.smoothing=1;}
@@ -1049,18 +1122,40 @@ int Application::Run() {
 
             // Safe In-Game Runtime Map Loading (Executed before command list recording)
             if (EngineLevel::LevelSystem::Get().HasPendingLoad()) {
-                EngineLevel::LevelSystem::Get().ProcessPendingLoad(m_renderer.get(), m_camera.get());
+                if (EngineLevel::LevelSystem::Get().ProcessPendingLoad(m_renderer.get(), m_camera.get()) && m_gameplay)
+                    m_gameplay->Clear();
             }
 
             // FPS Calculation
             static float frameCount = 0;
             static float timeAccumulator = 0.0f;
+#if defined(_WIN32)
+            static uint64_t previousGeneratedFrames = m_renderer->GetGeneratedFrameCount();
+            static float generatedFps = 0.f;
+#endif
             frameCount++;
             timeAccumulator += realFrameTime;
             if (timeAccumulator >= 0.5f) {
                 m_fps = frameCount / timeAccumulator;
+#if defined(_WIN32)
+                const auto frames = m_renderer->GetGeneratedFrameCount();
+                generatedFps = frames >= previousGeneratedFrames
+                    ? static_cast<float>(frames - previousGeneratedFrames) / timeAccumulator : 0.f;
+                previousGeneratedFrames = frames;
+#endif
                 frameCount = 0;
                 timeAccumulator = 0.0f;
+            }
+            char fpsLabel[64];
+            float displayFps = m_fps;
+#if defined(_WIN32)
+            if (m_renderer->IsFrameGenerationRequested()) {
+                displayFps += generatedFps;
+                std::snprintf(fpsLabel, sizeof(fpsLabel), "%.1f (%.1f without FG)", displayFps, m_fps);
+            } else
+#endif
+            {
+                std::snprintf(fpsLabel, sizeof(fpsLabel), "%.1f", displayFps);
             }
 
             // Update DualSense & DualShock 4 Controllers
@@ -1156,6 +1251,9 @@ int Application::Run() {
 
             bool currentTab = m_window->IsKeyDown(VK_TAB) || padToggleEditor;
             if (currentTab && !prevTab) {
+#if defined(_WIN32) && !defined(ENGINE_RELEASE)
+                graphicsAutoTune.Cancel(*m_renderer);
+#endif
                 bool newState = s_cursorUnlockedForConsole ? true : !m_window->IsCursorEnabled();
                 s_cursorUnlockedForConsole = false;
                 m_window->SetCursorEnabled(newState);
@@ -1292,6 +1390,26 @@ int Application::Run() {
                 float rainIntensity = rainSys.GetSettings().enabled ? rainSys.GetSettings().intensity : 0.0f;
                 m_renderer->SetRainIntensity(rainIntensity);
             }
+            // One real second advances one in-game minute. Use unclamped wall time.
+            bool editorTimePaused = false;
+#ifndef ENGINE_RELEASE
+            editorTimePaused = (m_window->IsCursorEnabled() && !s_cursorUnlockedForConsole) || s_rmbViewportActive;
+#endif
+            if (m_worldClockEnabled) {
+                if (m_worldClockRunning && !editorTimePaused && realFrameTime > 0.0f)
+                    m_worldMinutes = std::fmod(m_worldMinutes + static_cast<double>(realFrameTime), 1440.0);
+                const double phase = (m_worldMinutes / 1440.0 - 0.25) * 6.283185307179586;
+                const float elevation = static_cast<float>(std::sin(phase) * 65.0);
+                const float azimuth = static_cast<float>(std::atan2(std::cos(phase), 0.35) * 57.29577951308232 + 180.0);
+                m_renderer->SetSunAzimuth(azimuth);
+                m_renderer->SetSunElevation(elevation);
+            }
+            auto setWorldTimePreset = [&](int hour, int minute) {
+                m_worldTimeHour = hour;
+                m_worldTimeMinute = minute;
+                m_worldMinutes = hour * 60.0 + minute;
+                m_worldClockEnabled = true;
+            };
             m_camera->SetCollisionBoxes(std::move(colBoxes));
             m_camera->SetCollisionEnabled(true);
 #if defined(ENGINE_PLATFORM_PS4) || defined(__PS4__) || defined(__ORBIS__)
@@ -1689,8 +1807,19 @@ int Application::Run() {
             { EngineDebug::ScopedTimer profile(EngineDebug::Subsystem::SceneGraph);EngineScene::SceneGraph::Get().SyncWithRenderer(m_renderer.get()); }
 
             static bool previousInteract=false;
+            static bool previousChoice[4]{};
             bool interact=m_window->IsKeyDown('E');
-            if(m_gameplay&&!m_camera->IsFreecamMode()&&!EnginePhysics::PhysicsSystem::Get().IsPaused())m_gameplay->Update(*m_renderer,m_camera->GetPosition(),dt,interact&&!previousInteract);
+            const bool runGameplay = m_gameplay && !m_camera->IsFreecamMode() && !EnginePhysics::PhysicsSystem::Get().IsPaused();
+            if (runGameplay) m_gameplay->Update(*m_renderer,m_camera->GetPosition(),dt,interact&&!previousInteract);
+            bool selectedChoice = false;
+            for (size_t i = 0; i < 4; ++i) {
+                const bool pressed = m_window->IsKeyDown(static_cast<int>('1' + i));
+                if (runGameplay && pressed && !previousChoice[i] && !selectedChoice) {
+                    m_gameplay->Choose(*m_renderer, i);
+                    selectedChoice = true;
+                }
+                previousChoice[i] = pressed;
+            }
             previousInteract=interact;
 
             // Update Lua Script System (calls OnUpdate on all loaded scripts + hot-reload check)
@@ -1722,8 +1851,22 @@ int Application::Run() {
             EnginePostProcess::PostProcessSystem::Get().Update(dt, m_camera->GetPosition());
 
             if (!m_renderer->IsDeviceRemoved()) {
-#ifndef ENGINE_RELEASE
+#if defined(_WIN32) || !defined(ENGINE_RELEASE)
                 m_renderer->BeginUI();
+                const auto drawGameHUD = [&](const EngineProject::HUDLayout& layout, bool preview) {
+                    if (!ImGui::GetCurrentContext() || !m_gameplay) return;
+                    if (layout.empty() && m_gameplay->GetMessage().empty()) return;
+                    const auto position = m_camera->GetPosition();
+                    const auto& physics = EnginePhysics::PhysicsSystem::Get();
+                    const EngineUI::HUDValues values{position.x, position.y, position.z,
+                        std::abs(physics.DrivenVehicleSpeed()) * 3.6f, fpsLabel, physics.IsDriving(), m_gameplay->GetMessage()};
+                    EngineUI::DrawGameHUD(layout, values, preview);
+                };
+                if (!m_camera->IsFreecamMode()) {
+                    drawGameHUD(EngineProject::current.hud, false);
+                }
+#endif
+#ifndef ENGINE_RELEASE
                 if (dualSense.IsConnected() && m_window->IsCursorEnabled()) {
                     ImGuiIO& io = ImGui::GetIO();
                     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
@@ -1801,6 +1944,10 @@ int Application::Run() {
                 static bool s_showSpawner=false, s_showEnvironment=false, s_showGraphics=false, s_showSequencer=false, s_showPhysicsTools=false;
                 if (m_benchmarkAntialiasing >= 0) s_showGraphics=true;
                 static bool showRainWindow=false, showDualSenseWindow=false, showProjectSettings=false;
+#if defined(ENGINE_EDITOR)
+                static bool showHUD = false, previewHUD = true;
+                static auto hudDraft = EngineProject::current.hud;
+#endif
                 static bool s_showCCTUI=false, s_showClothUI=false, s_showHairUI=false, s_showAnimUI=false, s_showMultiplayerUI=false;
                 static bool s_showRenderDebugUI=false, s_showMemoryDebugUI=false, s_showSecurityDebugUI=false, s_showInputDebugUI=false;
                 static bool s_showTimeSimDebugUI=false, s_showImGuiMetrics=false, s_showImGuiStyleEditor=false;
@@ -1822,10 +1969,19 @@ int Application::Run() {
                 m_renderer->DrawPipelineDiagnostics(showPipeline);
 #endif
                 const bool showEditorUI = (m_window->IsCursorEnabled() && !s_cursorUnlockedForConsole) || s_rmbViewportActive;
+#if defined(ENGINE_EDITOR)
+                if (showEditorUI && showHUD) {
+                    EngineUI::DrawHUDEditor(showHUD, hudDraft, previewHUD);
+                    if (showHUD && previewHUD && m_camera->IsFreecamMode()) drawGameHUD(hudDraft, true);
+                }
+#endif
                 if (showEditorUI) {
                     if(ImGui::BeginMainMenuBar()) {
                         if(ImGui::BeginMenu("Project")) {
                             ImGui::MenuItem("Project Settings...",nullptr,&showProjectSettings);
+#if defined(ENGINE_EDITOR)
+                            ImGui::MenuItem("Game HUD...", nullptr, &showHUD);
+#endif
                             if(ImGui::MenuItem("Build game..."))EngineProject::ShowProjectBuild(EngineProject::current);
                             ImGui::EndMenu();
                         }
@@ -2027,7 +2183,11 @@ int Application::Run() {
                         if(ImGui::MenuItem("Play", "TAB")) { m_camera->SetFreecamMode(false);m_window->SetCursorEnabled(false);m_window->ResetMouseDelta(); }
                         ImGui::EndMainMenuBar();
                     }
-                    if(ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S,false)) SaveScene();
+                    if(ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S,false)
+#if defined(_WIN32)
+                        && !graphicsAutoTune.Running()
+#endif
+                    ) SaveScene();
                     if(!ImGui::GetIO().WantTextInput&&ImGui::GetIO().KeyCtrl){
                         if(ImGui::IsKeyPressed(ImGuiKey_Z,false)){restoreHistory(ImGui::GetIO().KeyShift);s_selectedModelType=0;s_selectedModelIndex=-1;}
                         if(ImGui::IsKeyPressed(ImGuiKey_Y,false)){restoreHistory(true);s_selectedModelType=0;s_selectedModelIndex=-1;}
@@ -2663,6 +2823,27 @@ int Application::Run() {
                             bool physics = ImGui::Checkbox("Visible", &model.visible);
                             auto selectedCharacter=EngineAnim::AnimationSystem::Get().FindCharacterForModel(m_renderer.get(),model.modelId);
                             bool ragdollActive=selectedCharacter&&selectedCharacter->ragdoll.Active();
+#if defined(_WIN32)
+                            if constexpr (std::is_same_v<std::decay_t<decltype(model)>, Renderer::RenderDynamicModel>) {
+                                if (!model.filepath.empty()) {
+                                    static uint32_t reimportedId = 0;
+                                    static bool reimportSucceeded = false;
+                                    ImGui::BeginDisabled(ragdollActive || selectedCharacter != nullptr);
+                                    if (ImGui::Button("Reimport mesh from source")) {
+                                        reimportedId = model.modelId;
+                                        reimportSucceeded = m_renderer->ReimportDynamicModel(model.modelId);
+                                        if (reimportSucceeded) {
+                                            EnginePhysics::PhysicsSystem::Get().ApplyModelPhysics(m_renderer.get(), model.modelId, true);
+                                        }
+                                    }
+                                    ImGui::EndDisabled();
+                                    if (reimportedId == model.modelId) {
+                                        ImGui::TextWrapped("%s", reimportSucceeded ? "Mesh updated." :
+                                            "Could not read or import the source model.");
+                                    }
+                                }
+                            }
+#endif
                             ImGui::BeginDisabled(ragdollActive);
                             if(ImGui::CollapsingHeader("Transform",ImGuiTreeNodeFlags_DefaultOpen)) {
                                 transform |= ImGui::DragFloat3("Position",&model.position.x,.05f);
@@ -2748,6 +2929,7 @@ int Application::Run() {
                                             if (ImGui::DragFloat("Speed limit (km/h)",&kmh,1.f,2.f,180.f)) {point.speedLimit=(std::clamp)(kmh/3.6f,.5f,50.f);aiChanged=true;}
                                             aiChanged |= ImGui::Checkbox("Stop sign",&point.stop);
                                             aiChanged |= ImGui::Checkbox("Red traffic signal",&point.redSignal);
+                                            aiChanged |= ImGui::DragFloat("Pedestrian crossing radius (m)", &point.crossingRadius, .1f, 0.f, 25.f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
                                             if(ImGui::Button("Remove waypoint"))remove=static_cast<int>(index);
                                             ImGui::TreePop();
                                         }
@@ -3257,6 +3439,36 @@ int Application::Run() {
                     } // Spawner
                     if(s_showEnvironment) {
                     ImGui::Begin("Environment Controls", &s_showEnvironment, ImGuiWindowFlags_AlwaysAutoResize);
+                    ImGui::SeparatorText("Time of day");
+                    ImGui::SetNextItemWidth(100.0f);
+                    ImGui::InputInt("Hours (0-23)", &m_worldTimeHour);
+                    ImGui::SetNextItemWidth(100.0f);
+                    ImGui::InputInt("Minutes (0-59)", &m_worldTimeMinute);
+                    m_worldTimeHour = (std::clamp)(m_worldTimeHour, 0, 23);
+                    m_worldTimeMinute = (std::clamp)(m_worldTimeMinute, 0, 59);
+                    if (ImGui::Button("Set time")) {
+                        m_worldMinutes = m_worldTimeHour * 60.0 + m_worldTimeMinute;
+                        m_worldClockEnabled = true;
+                        sceneDirty = true;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button(m_worldClockRunning ? "Pause time" : "Start time")) {
+                        if (!m_worldClockEnabled)
+                            m_worldMinutes = m_worldTimeHour * 60.0 + m_worldTimeMinute;
+                        m_worldClockEnabled = true;
+                        m_worldClockRunning = !m_worldClockRunning;
+                        sceneDirty = true;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Manual sun")) {
+                        m_worldClockEnabled = false;
+                        m_worldClockRunning = false;
+                        sceneDirty = true;
+                    }
+                    if (m_worldClockRunning) ImGui::TextDisabled("Time is paused while the editor is open; press Tab to resume.");
+                    ImGui::Text("Game time: %02d:%02d  (1 second = 1 minute)",
+                        static_cast<int>(m_worldMinutes) / 60, static_cast<int>(m_worldMinutes) % 60);
+                    ImGui::Separator();
                     ImGui::Text("Sun Light Parameters");
                     ImGui::Separator();
 
@@ -3298,38 +3510,10 @@ int Application::Run() {
 
                     ImGui::Separator();
                     ImGui::Text("Presets");
-                    if (ImGui::Button("Morning")) {
-                        m_renderer->SetLightDir(XMFLOAT3(-1.0f, -0.3f, 0.0f));
-                        m_renderer->SetLightColor(XMFLOAT3(1.0f, 0.8f, 0.6f));
-                        m_renderer->SetSkyColor(XMFLOAT3(0.4f, 0.6f, 0.9f));
-                        m_renderer->SetSunAzimuth(45.0f);
-                        m_renderer->SetSunElevation(20.0f);
-                        sceneDirty = true;
-                    }
-                    if (ImGui::Button("Day")) {
-                        m_renderer->SetLightDir(XMFLOAT3(-0.6f, -0.7f, -0.3f));
-                        m_renderer->SetLightColor(XMFLOAT3(1.0f, 1.0f, 1.0f));
-                        m_renderer->SetSkyColor(XMFLOAT3(0.2f, 0.4f, 0.8f));
-                        m_renderer->SetSunAzimuth(135.0f);
-                        m_renderer->SetSunElevation(60.0f);
-                        sceneDirty = true;
-                    }
-                    if (ImGui::Button("Sunset")) {
-                        m_renderer->SetLightDir(XMFLOAT3(1.0f, -0.15f, 0.0f));
-                        m_renderer->SetLightColor(XMFLOAT3(1.0f, 0.4f, 0.1f));
-                        m_renderer->SetSkyColor(XMFLOAT3(0.8f, 0.4f, 0.2f));
-                        m_renderer->SetSunAzimuth(270.0f);
-                        m_renderer->SetSunElevation(5.0f);
-                        sceneDirty = true;
-                    }
-                    if (ImGui::Button("Night")) {
-                        m_renderer->SetLightDir(XMFLOAT3(-0.35f, -0.75f, 0.45f));
-                        m_renderer->SetLightColor(XMFLOAT3(0.35f, 0.45f, 0.70f));
-                        m_renderer->SetSkyColor(XMFLOAT3(0.04f, 0.08f, 0.18f));
-                        m_renderer->SetSunAzimuth(210.0f);
-                        m_renderer->SetSunElevation(-25.0f);
-                        sceneDirty = true;
-                    }
+                    if (ImGui::Button("Morning")) { setWorldTimePreset(7, 0); sceneDirty = true; }
+                    if (ImGui::Button("Day")) { setWorldTimePreset(12, 0); sceneDirty = true; }
+                    if (ImGui::Button("Sunset")) { setWorldTimePreset(18, 0); sceneDirty = true; }
+                    if (ImGui::Button("Night")) { setWorldTimePreset(0, 0); sceneDirty = true; }
                     
                     ImGui::Separator();
                     ImGui::Text("Cloud Parameters");
@@ -3355,7 +3539,7 @@ int Application::Run() {
                             // TAB 1: DISPLAY & PERFORMANCE
                             if (ImGui::BeginTabItem("Display")) {
                                 ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "Performance Metrics:");
-                                ImGui::Text("FPS: %.1f  |  Frame Time: %.2f ms", m_fps, dt * 1000.0f);
+                                ImGui::Text("FPS: %s  |  Frame Time: %.2f ms", fpsLabel, dt * 1000.0f);
                                 ImGui::Text("Display: %d x %d  |  Render: %d x %d", 
                                     m_renderer->GetWidth(), m_renderer->GetHeight(),
                                     m_renderer->GetRenderWidth(), m_renderer->GetRenderHeight());
@@ -3371,6 +3555,73 @@ int Application::Run() {
                                 if (ImGui::Checkbox("V-Sync", &vsync)) {
                                     m_renderer->SetVSyncEnabled(vsync);
                                 }
+                                sceneDirty |= ImGui::SliderInt("Target FPS", &m_targetFps, 30, 360, "%d FPS", ImGuiSliderFlags_AlwaysClamp);
+                                sceneDirty |= ImGui::Checkbox("Limit rendered FPS to target", &m_limitFrameRate);
+#if defined(_WIN32)
+                                const char* upscalerNames[] = {"Native", "DLSS", "FSR", "XeSS"};
+                                const char* presetNames[] = {"Auto", "Native AA", "Quality", "Balanced", "Performance", "Ultra Performance"};
+                                static int autoUpscaler = static_cast<int>(m_renderer->GetUpscaleTechnique());
+                                static int qualityPreset = 0;
+                                if (ImGui::BeginCombo("Upscaler", upscalerNames[autoUpscaler])) {
+                                    for (int i = 0; i < IM_ARRAYSIZE(upscalerNames); ++i) {
+                                        const bool supported = EngineUI::GraphicsAutoTune::Supported(*m_renderer, static_cast<UpscaleTechnique>(i));
+                                        if (ImGui::Selectable(upscalerNames[i], i == autoUpscaler, supported ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_Disabled))
+                                            autoUpscaler = i;
+                                    }
+                                    ImGui::EndCombo();
+                                }
+                                const auto technique = static_cast<UpscaleTechnique>(autoUpscaler);
+                                ImGui::BeginDisabled(technique == UpscaleTechnique::None);
+                                ImGui::Combo("Upscaler quality", &qualityPreset, presetNames, IM_ARRAYSIZE(presetNames));
+                                ImGui::EndDisabled();
+                                const bool automatic = qualityPreset == 0 || technique == UpscaleTechnique::None;
+                                ImGui::BeginDisabled(m_benchmarkFrameLimit || !m_camera->IsFreecamMode() ||
+                                    !EngineUI::GraphicsAutoTune::Supported(*m_renderer, technique));
+                                if (automatic) {
+                                    if (ImGui::Button("Run graphics auto-tune") && graphicsAutoTune.Start(*m_renderer, technique, m_targetFps))
+                                        ImGui::OpenPopup("Graphics auto-tune");
+                                } else if (ImGui::Button("Apply upscaler preset")) {
+                                    m_renderer->SetUpscaleTechnique(technique);
+                                    m_renderer->SetUpscaleQuality(static_cast<UpscaleQuality>(qualityPreset - 1));
+                                    m_dynamicResolutionEnabled = false;
+                                    sceneDirty = true;
+                                }
+                                ImGui::EndDisabled();
+                                const auto currentTechnique = static_cast<int>(m_renderer->GetUpscaleTechnique());
+                                const auto currentQuality = static_cast<int>(m_renderer->GetUpscaleQuality());
+                                if (currentTechnique != 0) ImGui::Text("Applied: %s / %s", upscalerNames[currentTechnique],
+                                    m_dynamicResolutionEnabled && currentTechnique == static_cast<int>(UpscaleTechnique::FSR)
+                                        ? "Dynamic resolution" : presetNames[currentQuality + 1]);
+                                else ImGui::TextUnformatted("Applied: Native");
+                                if (!graphicsAutoTune.Status().empty()) {
+                                    ImGui::TextWrapped("%s", graphicsAutoTune.Status().c_str());
+                                    if (graphicsAutoTune.ResultFps() > 0.f) ImGui::Text("Measured base FPS: %.1f", graphicsAutoTune.ResultFps());
+                                }
+                                if (ImGui::BeginPopupModal("Graphics auto-tune", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                                    if (graphicsAutoTune.Running()) {
+                                        ImGui::Text("Testing %s profile %zu of %zu", upscalerNames[autoUpscaler], graphicsAutoTune.Step(), graphicsAutoTune.Steps());
+                                        ImGui::TextUnformatted("Measuring base FPS with frame generation and V-Sync paused.");
+                                        if (ImGui::Button("Cancel")) {
+                                            graphicsAutoTune.Cancel(*m_renderer);
+                                            ImGui::CloseCurrentPopup();
+                                        }
+                                    } else {
+                                        ImGui::TextUnformatted(graphicsAutoTune.Status().c_str());
+                                        if (graphicsAutoTune.ResultFps() > 0.f) ImGui::Text("Measured base FPS: %.1f", graphicsAutoTune.ResultFps());
+                                        if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::EndPopup();
+                                }
+                                if (ImGui::Checkbox("Dynamic resolution (FSR)", &m_dynamicResolutionEnabled)) {
+                                    if (m_dynamicResolutionEnabled) m_renderer->SetUpscaleTechnique(UpscaleTechnique::FSR);
+                                    sceneDirty = true;
+                                }
+                                if (m_dynamicResolutionEnabled) {
+                                    sceneDirty |= ImGui::SliderInt("Minimum render scale", &m_minimumRenderScale, 50, 100, "%d%%", ImGuiSliderFlags_AlwaysClamp);
+                                    if (!m_renderer->IsDynamicResolutionActive())
+                                        ImGui::TextWrapped("Dynamic resolution requires FSR and frame generation off.");
+                                }
+#endif
 
                                 float fov = m_renderer->GetFOV();
                                 if (ImGui::SliderFloat("FOV", &fov, 45.0f, 110.0f, "%.0f deg")) {
@@ -3526,7 +3777,7 @@ int Application::Run() {
                                 if(!m_renderer->IsDLSSGSupported())ImGui::TextDisabled("NVIDIA FG/MFG unavailable on this GPU/driver. FSR FG can be used separately.");
                                 bool fsrFG=m_renderer->IsFSRFrameGenEnabled();
                                 if(ImGui::Checkbox("AMD FSR Frame Generation (2x)",&fsrFG))m_renderer->SetFSRFrameGenEnabled(fsrFG);
-                                ImGui::Text("FSR interpolation: %s",m_renderer->IsFSRFrameGenActive()?"active":"idle");
+                                ImGui::Text("FSR interpolation: %s",m_renderer->GetFSRFrameGenStatus());
                                 ImGui::TextWrapped("Frame generation modes are mutually exclusive. Generated frames do not increase simulation FPS.");
                                 // Intel XeSS Frame Generation (XeFG)
                                 if (currentTech == UpscaleTechnique::XeSS || m_renderer->IsXeSSSupported()) {
@@ -3671,6 +3922,11 @@ int Application::Run() {
 
                                     if (isPT) {
                                         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Full Path Tracing Mode (Multi-Bounce GI):");
+                                        int samples = m_renderer->GetPathTracingSamples();
+                                        if (ImGui::SliderInt("Samples per pixel", &samples, 1, 8)) {
+                                            m_renderer->SetPathTracingSamples(samples);
+                                            sceneDirty = true;
+                                        }
                                         int bounces = m_renderer->GetPathTracingBounces();
                                         if (ImGui::SliderInt("Max Bounces", &bounces, 1, 4)) {
                                             m_renderer->SetPathTracingBounces(bounces);
@@ -5203,8 +5459,8 @@ int Application::Run() {
                             ImGui::Text("Display Resolution: %d x %d  |  Internal Render: %d x %d",
                                 m_renderer->GetWidth(), m_renderer->GetHeight(),
                                 m_renderer->GetRenderWidth(), m_renderer->GetRenderHeight());
-                            ImGui::Text("CPU Frame Time: %.2f ms (%.1f FPS)  |  GPU Frame: %.2f ms  |  GPU Wait: %.2f ms",
-                                dt * 1000.0f, m_fps, m_renderer->GetLastGpuFrameMs(), m_renderer->GetLastGpuWaitMs());
+                            ImGui::Text("CPU Frame Time: %.2f ms  |  FPS: %s  |  GPU Frame: %.2f ms  |  GPU Wait: %.2f ms",
+                                dt * 1000.0f, fpsLabel, m_renderer->GetLastGpuFrameMs(), m_renderer->GetLastGpuWaitMs());
 
                             uint32_t totalStaticTris = 0;
                             for (const auto& m : models) if (m.visible) totalStaticTris += m.indexCount / 3;
@@ -5698,11 +5954,13 @@ int Application::Run() {
                             ImGui::Separator();
 
                             ImGui::SeparatorText("One-Click Time-of-Day Presets");
-                            const char* todPresets[] = { "dawn", "morning", "noon", "golden", "sunset", "dusk", "night", "bloodmoon" };
+                            const char* todPresets[] = { "dawn", "morning", "noon", "golden", "sunset", "dusk", "night", "midnight" };
                             for (int i = 0; i < 8; ++i) {
                                 if (i > 0 && i != 4) ImGui::SameLine();
                                 if (ImGui::Button(todPresets[i], ImVec2(115, 26))) {
-                                    EngineDebug::DebugConsole::Get().Execute(std::string("tod ") + todPresets[i]);
+                                    const int hours[] = { 6, 8, 12, 17, 18, 19, 0, 0 };
+                                    setWorldTimePreset(hours[i], 0);
+                                    sceneDirty = true;
                                 }
                             }
 
@@ -5965,7 +6223,16 @@ int Application::Run() {
                     }
                 }
 
-                if (s_debugShowAllColliders || s_debugShowModelBounds || s_debugShowLightGizmos || s_debugShowWorldAxes) {
+                const EnginePhysics::VehicleSettings* routePreview = nullptr;
+                if (showEditorUI && m_camera->IsFreecamMode() && s_selectedModelIndex >= 0) {
+                    const auto index = static_cast<size_t>(s_selectedModelIndex);
+                    if (s_selectedModelType == 1 && index < m_renderer->GetModels().size())
+                        routePreview = &m_renderer->GetModels()[index].vehicle;
+                    if (s_selectedModelType == 2 && index < m_renderer->GetDynamicModels().size())
+                        routePreview = &m_renderer->GetDynamicModels()[index].vehicle;
+                    if (routePreview && routePreview->route.empty()) routePreview = nullptr;
+                }
+                if (routePreview || s_debugShowAllColliders || s_debugShowModelBounds || s_debugShowLightGizmos || s_debugShowWorldAxes) {
                     const auto& models = m_renderer->GetModels();
                     const auto& dynModels = m_renderer->GetDynamicModels();
                     ImDrawList* fgDraw = ImGui::GetForegroundDrawList();
@@ -5981,6 +6248,22 @@ int Application::Run() {
                                 ImVec2((XMVectorGetX(b) * 0.5f + 0.5f) * m_width, (-XMVectorGetY(b) * 0.5f + 0.5f) * m_height),
                                 col, thickness);
                         };
+
+                        if (routePreview) {
+                            const auto& points = routePreview->route;
+                            for (size_t i = 0; i < points.size(); ++i) {
+                                const auto& point = points[i];
+                                const XMFLOAT3 position{point.x, point.y + .15f, point.z};
+                                const ImU32 color = point.redSignal ? IM_COL32(255, 65, 65, 255)
+                                    : point.stop ? IM_COL32(255, 185, 50, 255)
+                                    : point.crossingRadius > 0 ? IM_COL32(90, 255, 110, 255) : IM_COL32(70, 230, 255, 255);
+                                projectLine(position, {position.x, position.y + .65f, position.z}, color, 3.f);
+                                if (i + 1 < points.size() || (routePreview->aiLoop && points.size() > 1)) {
+                                    const auto& next = points[(i + 1) % points.size()];
+                                    projectLine(position, {next.x, next.y + .15f, next.z}, IM_COL32(70, 230, 255, 220), 2.f);
+                                }
+                            }
+                        }
 
                         if (s_debugShowWorldAxes) {
                             projectLine({0,0,0}, {5,0,0}, IM_COL32(255, 60, 60, 240), 2.5f);
@@ -6049,8 +6332,8 @@ int Application::Run() {
                     ImGui::SetNextWindowBgAlpha(0.65f);
                     if (ImGui::Begin("##InGameTelemetryHUD", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs)) {
                         ImVec4 fpsCol = (m_fps >= 58.0f) ? ImVec4(0.25f, 1.0f, 0.45f, 1.0f) : ((m_fps >= 30.0f) ? ImVec4(1.0f, 0.85f, 0.25f, 1.0f) : ImVec4(1.0f, 0.35f, 0.35f, 1.0f));
-                        ImGui::TextColored(fpsCol, "FPS: %.1f  |  Frame: %.2f ms  |  GPU: %.2f ms (Wait: %.2f ms)",
-                            m_fps, realFrameTime * 1000.0f, m_renderer->GetLastGpuFrameMs(), m_renderer->GetLastGpuWaitMs());
+                        ImGui::TextColored(fpsCol, "FPS: %s  |  Frame: %.2f ms  |  GPU: %.2f ms (Wait: %.2f ms)",
+                            fpsLabel, realFrameTime * 1000.0f, m_renderer->GetLastGpuFrameMs(), m_renderer->GetLastGpuWaitMs());
 
                         if (EngineDebug::DebugConsole::Get().IsFpsOverlayEnabled()) {
                             const char* rtMode = !m_renderer->m_dxrEnabled ? "DX12 Raster" : (m_renderer->IsPathTracingEnabled() ? "DXR Full Path Tracing" : "DXR 1.1 Hybrid RT");
@@ -6085,7 +6368,11 @@ int Application::Run() {
                     ImGui::End();
                 }
 
-                if(!m_benchmarkFrameLimit){
+                if(!m_benchmarkFrameLimit
+#if defined(_WIN32)
+                    && !graphicsAutoTune.Running()
+#endif
+                ){
                     auto& saves=EngineSave::SaveManager::Get();
                     if(!m_recoveryChecked){
                         m_recoveryChecked=true;std::error_code ec;
@@ -6120,6 +6407,9 @@ int Application::Run() {
                         ImGui::EndPopup();
                     }
                 }
+#if defined(_WIN32)
+                if (!graphicsAutoTune.Running()) {
+#endif
                 static bool pendingSave=false;
                 static auto lastEdit = std::chrono::steady_clock::now();
                 bool edited = sceneDirty;
@@ -6140,6 +6430,9 @@ int Application::Run() {
                 if (pendingSave && !ImGui::IsMouseDown(0) && !ImGui::IsAnyItemActive() && std::chrono::steady_clock::now()-lastEdit > std::chrono::milliseconds(750) && !m_benchmarkFrameLimit && m_camera->IsFreecamMode()) {
                     SaveScene(); pendingSave=false;
                 }
+#if defined(_WIN32)
+                }
+#endif
                 EngineDebug::Profiler::Get().RecordSubsystemTime(EngineDebug::Subsystem::UI,std::chrono::duration<float,std::milli>(std::chrono::steady_clock::now()-editorUIStart).count());
 #endif
 
@@ -6165,6 +6458,32 @@ int Application::Run() {
                     m_camera->SetYaw(XMConvertToRadians(m_benchmarkSkyYaw));m_camera->SetPitch(.15f);
                     m_renderer->SetSunAzimuth(m_benchmarkSunAzimuth);m_renderer->SetSunElevation(m_benchmarkSunElevation);
                 }
+#if defined(_WIN32)
+                if (m_benchmarkFrameLimit) {
+                    wchar_t cameraArgs[256] = {};
+                    if (GetEnvironmentVariableW(L"IDK_BENCHMARK_CAMERA", cameraArgs, 256)) {
+                        float x, y, z, yaw, pitch;
+                        if (swscanf_s(cameraArgs, L"%f %f %f %f %f", &x, &y, &z, &yaw, &pitch) == 5) {
+                            m_camera->SetFreecamMode(true); m_camera->SetPosition(x, y, z);
+                            m_camera->SetYaw(yaw); m_camera->SetPitch(pitch);
+                        }
+                    }
+                }
+#endif
+#if defined(_WIN32)
+                bool suspendPacing = false;
+#ifndef ENGINE_RELEASE
+                if (graphicsAutoTune.Running() && (!m_window->IsCursorEnabled() || s_cursorUnlockedForConsole))
+                    graphicsAutoTune.Cancel(*m_renderer);
+                if (graphicsAutoTune.Update(*m_renderer, realFrameTime)) {
+                    if (m_renderer->GetUpscaleTechnique() == UpscaleTechnique::FSR)
+                        m_dynamicResolutionEnabled = false;
+                    m_historyChanged = true;
+                }
+                suspendPacing = graphicsAutoTune.Running();
+#endif
+                m_renderer->UpdateDynamicResolution(m_dynamicResolutionEnabled && !suspendPacing, m_targetFps, m_minimumRenderScale, realFrameTime);
+#endif
                 { EngineDebug::ScopedTimer profile(EngineDebug::Subsystem::Render);m_renderer->Render(dt); }
                 if (m_renderer->IsDeviceRemoved()) return 3;
                 if (m_benchmarkFrameLimit) {
@@ -6227,6 +6546,14 @@ int Application::Run() {
                 telemetry.gpuWaitMs = static_cast<float>(m_renderer->GetLastGpuWaitMs());
                 EngineDebug::Profiler::Get().SetGpuTelemetry(telemetry);
                 EngineDebug::Profiler::Get().EndFrame();
+                if (m_limitFrameRate && !m_benchmarkFrameLimit
+#if defined(_WIN32)
+                    && !suspendPacing
+#endif
+                ) {
+                    const auto frameBudget = std::chrono::duration<double>(1.0 / m_targetFps);
+                    std::this_thread::sleep_until(frameStart + frameBudget);
+                }
 
 #if defined(ENGINE_PLATFORM_PS4) || defined(__PS4__) || defined(__ORBIS__)
                 static uint32_t s_ps4FrameCount = 0;
@@ -6245,6 +6572,9 @@ int Application::Run() {
         }
     }
     LOG("App::Run: Exiting loop, saving scene to Save1.save");
+#if defined(_WIN32) && !defined(ENGINE_RELEASE)
+    graphicsAutoTune.Cancel(*m_renderer);
+#endif
     if (!m_benchmarkFrameLimit) SaveScene();
 #if defined(_WIN32)
     return m_benchmarkFrameLimit ? 0 : static_cast<int>(msg.wParam);

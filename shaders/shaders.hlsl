@@ -48,6 +48,10 @@ cbuffer SceneConstantBuffer : register(b0)
     PointLightData pointLights[16];
     SpotLightData  spotLights[16];
     row_major float4x4 PreviousModel;
+    row_major float4x4 SpotShadowViewProj[2];
+    float4 SpotShadowIndices;
+    row_major float4x4 PointShadowViewProj[12];
+    float4 PointShadowParams;
 };
 
 Texture2D    g_Textures[1000] : register(t0, space0);
@@ -89,6 +93,8 @@ Texture2D<float4> g_rvtNormalAtlas : register(t7, space1);
 Texture2D<float4> g_rvtIrradianceAtlas : register(t8, space1);
 Texture2D<uint>   g_rvtPageTable : register(t9, space1);
 Texture3D         g_volumetricFogVolume : register(t10, space1);
+Texture2D<float> g_spotShadowAtlas : register(t11, space1);
+Texture2D<float> g_pointShadowAtlas : register(t12, space1);
 
 struct Payload {
     uint MeshletIndices[32];
@@ -399,18 +405,12 @@ PSOutput PSMain(PSInput input)
                 float2 texelSize = float2(1.0f / 2048.0f, 1.0f / 2048.0f);
                 float filterRadius = 2.2f;
 
-                // Random sub-pixel rotation angle per screen pixel (eliminates banding)
-                float noise = InterleavedGradientNoise(input.position.xy);
-                float angle = noise * 6.2831853f;
-                float sinA = sin(angle);
-                float cosA = cos(angle);
-                float2x2 rotMat = float2x2(cosA, -sinA, sinA, cosA);
-
-                // 16-Tap Poisson Disk PCF Filtering
+                // A fixed symmetric PCF kernel avoids a visible pixel-sized noise
+                // pattern when a shadow falls on a dark surface.
                 float shadowSum = 0.0f;
                 [unroll]
                 for (int i = 0; i < 16; ++i) {
-                    float2 sampleOffset = mul(PoissonDisk16[i], rotMat) * texelSize * filterRadius;
+                    float2 sampleOffset = PoissonDisk16[i] * texelSize * filterRadius;
                     shadowSum += g_vsmAtlas.SampleCmpLevelZero(g_ShadowSampler, shadowUV + sampleOffset, currentDepth - bias);
                 }
                 shadowFactor = shadowSum / 16.0f;
@@ -453,7 +453,33 @@ PSOutput PSMain(PSInput input)
             float3 kD_p = (float3(1.0f, 1.0f, 1.0f) - kS_p) * (1.0f - metallic);
             float NdotL_p = max(dot(N, L_point), 0.0f);
 
-            directLight += (kD_p * albedo / PI + spec_p) * pl.color * (pl.intensity * atten * NdotL_p);
+            float pointShadow = 1.0f;
+            int pointShadowSlot = abs(PointShadowParams.x - float(plIdx)) < .25f ? 0 :
+                                  (abs(PointShadowParams.y - float(plIdx)) < .25f ? 1 : -1);
+            if (pointShadowSlot >= 0) {
+                float3 fromLight = input.worldPos - pl.position;
+                float3 absDir = abs(fromLight);
+                int face = absDir.x >= absDir.y && absDir.x >= absDir.z ? (fromLight.x >= 0 ? 0 : 1) :
+                    (absDir.y >= absDir.z ? (fromLight.y >= 0 ? 2 : 3) : (fromLight.z >= 0 ? 4 : 5));
+                int atlasFace = pointShadowSlot * 6 + face;
+                float4 clip = mul(float4(input.worldPos + N * .012f, 1), PointShadowViewProj[atlasFace]);
+                if (clip.w > .001f) {
+                    float3 coord = clip.xyz / clip.w;
+                    float2 uv = coord.xy * float2(.5f,-.5f) + .5f;
+                    if (all(uv >= 0) && all(uv <= 1) && coord.z > 0 && coord.z < 1) {
+                        float2 tile = float2(atlasFace % 3, atlasFace / 3);
+                        float2 atlasUV = (tile + uv) / float2(3,4);
+                        float sum = 0;
+                        [unroll] for(int sy=-1;sy<=1;++sy) [unroll] for(int sx=-1;sx<=1;++sx) {
+                            float2 tap=clamp(atlasUV+float2(sx,sy)/float2(1536,2048),
+                                (tile + .5f/512.f)/float2(3,4),(tile+1-.5f/512.f)/float2(3,4));
+                            sum+=g_pointShadowAtlas.SampleCmpLevelZero(g_ShadowSampler,tap,coord.z-.0015f);
+                        }
+                        pointShadow = sum/9.f;
+                    }
+                }
+            }
+            directLight += (kD_p * albedo / PI + spec_p) * pl.color * (pl.intensity * atten * NdotL_p * pointShadow);
         }
     }
 
@@ -489,7 +515,25 @@ PSOutput PSMain(PSInput input)
                 float3 kD_s = (float3(1.0f, 1.0f, 1.0f) - kS_s) * (1.0f - metallic);
                 float NdotL_s = max(dot(N, L_spot), 0.0f);
 
-                directLight += (kD_s * albedo / PI + spec_s) * sl.color * (sl.intensity * atten * spotAtten * NdotL_s);
+                float localShadow = 1.0f;
+                [unroll] for (int shadowIndex = 0; shadowIndex < 2; ++shadowIndex) {
+                    if (abs(SpotShadowIndices[shadowIndex] - float(slIdx)) > 0.25f) continue;
+                    float4 shadowClip = mul(float4(input.worldPos + N * 0.015f, 1.0f), SpotShadowViewProj[shadowIndex]);
+                    if (shadowClip.w <= 0.001f) continue;
+                    float3 coord = shadowClip.xyz / shadowClip.w;
+                    float2 uv = coord.xy * float2(.5f, -.5f) + .5f;
+                    if (any(uv <= 0.001f) || any(uv >= 0.999f) || coord.z <= 0 || coord.z >= 1) continue;
+                    float2 base = float2(float(shadowIndex) * .5f, 0);
+                    float2 atlasUV = base + uv * .5f;
+                    float sum = 0;
+                    [unroll] for (int sy = -1; sy <= 1; ++sy)
+                        [unroll] for (int sx = -1; sx <= 1; ++sx) {
+                            float2 tap = clamp(atlasUV + float2(sx,sy) / 2048.0f, base + .5f / 2048.0f, base + .5f - .5f / 2048.0f);
+                            sum += g_spotShadowAtlas.SampleCmpLevelZero(g_ShadowSampler, tap, coord.z - .001f);
+                        }
+                    localShadow = sum / 9.0f;
+                }
+                directLight += (kD_s * albedo / PI + spec_s) * sl.color * (sl.intensity * atten * spotAtten * NdotL_s * localShadow);
             }
         }
     }

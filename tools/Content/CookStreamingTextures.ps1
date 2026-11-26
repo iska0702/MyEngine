@@ -20,7 +20,10 @@ exit /b %errorlevel%
     if($LASTEXITCODE -ne 0){Get-Content (Join-Path $directory 'compile.log') -Tail 12;throw 'Streaming cooker compilation failed'}
 }
 
-$content=if($env:IDK_PROJECT_CONTENT){$env:IDK_PROJECT_CONTENT}else{Join-Path $root 'Templates/Default/Content'}
+$content=if($env:IDK_PROJECT_CONTENT){$env:IDK_PROJECT_CONTENT}else{
+    $defaultTpl = Join-Path $root 'Templates/Default/Content'
+    if (Test-Path $defaultTpl) { $defaultTpl } else { Join-Path $root 'src/Content' }
+}
 $runtime=Join-Path $root "$Build/ThirdParty/Microsoft/DirectStorage"
 $staging=[IO.Path]::GetFullPath((Join-Path $directory ("staging-"+$Build)))
 if(!$staging.StartsWith([IO.Path]::GetFullPath($directory).TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Invalid staging directory'}

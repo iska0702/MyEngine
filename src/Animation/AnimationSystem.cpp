@@ -519,6 +519,25 @@ void AnimationSystem::DrawAnimationInspector(std::shared_ptr<CharacterAsset> cha
             ImGui::Separator();
             ImGui::SliderFloat("Search Interval", &mc.searchInterval, 0.05f, 0.50f, "%.2f sec");
             ImGui::SliderFloat("Transition Duration", &mc.transitionDuration, 0.05f, 0.50f, "%.2f sec");
+            if (ImGui::TreeNode("Blend into individual clips")) {
+                const auto& database = character->GetMotionDatabase();
+                if (!database.GetNumAnimations()) ImGui::TextUnformatted("Build the motion database to list clips.");
+                for (int i = 0; i < database.GetNumAnimations(); ++i) {
+                    const auto& clip = database.GetAnimationName(i);
+                    ImGui::PushID(i);
+                    auto custom = mc.clipTransitionDurations.find(clip);
+                    const bool hasOverride = custom != mc.clipTransitionDurations.end();
+                    float seconds = hasOverride ? custom->second : mc.transitionDuration;
+                    if (ImGui::SliderFloat(clip.c_str(), &seconds, .05f, .50f, "%.2f sec", ImGuiSliderFlags_AlwaysClamp))
+                        mc.clipTransitionDurations[clip] = seconds;
+                    if (hasOverride) {
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Reset")) mc.clipTransitionDurations.erase(clip);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::TreePop();
+            }
 
             ImGui::Separator();
             ImGui::Checkbox("Root Motion: Translation", &mc.rootMotionTranslation);

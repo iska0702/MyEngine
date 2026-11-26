@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cstdint>
 #include "ProjectTuning.h"
+#include "ProjectHUD.h"
 
 namespace EngineProject {
 inline std::string NewShaderAppId() {
@@ -38,6 +39,7 @@ struct Project {
     int width=1280,height=720;
     bool startWithMenu=true;
     ProjectTuning tuning;
+    HUDLayout hud;
     std::string developer,version="1.0.0",description;
     std::string shaderAppId;
     fs::path Root() const { return file.parent_path(); }
@@ -58,6 +60,7 @@ struct Project {
                 if(dash?shaderAppId[i]!='-':!std::isxdigit(static_cast<unsigned char>(shaderAppId[i])))throw std::runtime_error("Invalid ASD application GUID");}
         }
         tuning.Validate();
+        ValidateHUD(hud);
         if(name.empty()||name.size()>200)throw std::runtime_error("Invalid project name");
         if(width<320||width>16384||height<240||height>16384)throw std::runtime_error("Invalid window resolution");
         if(!(splashSeconds>=0&&splashSeconds<=120))throw std::runtime_error("Invalid splash duration");
@@ -82,6 +85,7 @@ struct Project {
         out<<"discordEnabled "<<discordEnabled<<"\ndiscordAppId "<<discordAppId<<'\n';
         out<<"steamAppId "<<steamAppId<<"\nsteamRestart "<<steamRestart<<'\n';
         auto values=tuning;values.Visit([&](auto key,float value,auto,auto,auto,auto){out<<"tuning_"<<key<<' '<<value<<'\n';});
+        WriteHUD(out, hud);
         out<<"splashSeconds "<<splashSeconds<<"\nwidth "<<width<<"\nheight "<<height<<"\nstartWithMenu "<<startWithMenu<<'\n';
         return out.str();
     }
@@ -103,7 +107,9 @@ struct Project {
         if(!(in>>magic>>version)||magic!="IDKP"||version!=1)throw std::runtime_error("Invalid or unsupported .idkp project");
         std::string line;std::getline(in,line);
         while(std::getline(in,line)){
-            std::istringstream row(line);std::string key;if(!(row>>key)||key[0]=='#')continue;
+            std::istringstream row(line);std::string key;if(!(row>>key))continue;
+            if(key=="#hudWidget"){ReadHUDWidget(row,p.hud);continue;}
+            if(key[0]=='#')continue;
             std::string* target=nullptr;
             if(key=="name")target=&p.name;else if(key=="content")target=&p.content;
             else if(key=="editorScene")target=&p.editorScene;else if(key=="startupLevel")target=&p.startupLevel;
@@ -119,6 +125,7 @@ struct Project {
             else if(key=="splashSeconds")row>>p.splashSeconds;else if(key=="startWithMenu")row>>p.startWithMenu;
             else if(key=="steamAppId")row>>p.steamAppId;else if(key=="steamRestart")row>>p.steamRestart;
             else if(key=="discordEnabled")row>>p.discordEnabled;else if(key=="discordAppId")row>>p.discordAppId;
+            else if(key=="hudWidget")ReadHUDWidget(row,p.hud);
             else {
                 bool found=false;p.tuning.Visit([&](auto name,float& value,auto,auto,auto,auto){if(key==std::string("tuning_")+name){row>>value;found=true;}});
                 if(!found)throw std::runtime_error("Unknown project setting: "+key);

@@ -71,6 +71,11 @@ set(CLIENT_SOURCES
     src/Input/DualShock.cpp
     src/Audio/DualSenseAudio.h
     src/Audio/DualSenseAudio.cpp
+    src/Upscaling/DLSS/DLSSSystem.h
+    src/Upscaling/DLSS/DLSSSystem.cpp
+    src/RayTracing/DXR/DXRSystem.h
+    src/RayTracing/DXR/DXRSystem.cpp
+    src/RayTracing/DXR/DxrTransform.h
     src/Upscaling/XeSS/XeSSSystem.h
     src/Upscaling/XeSS/XeSSSystem.cpp
     src/Storage/DirectStorage/DirectStorageSystem.h

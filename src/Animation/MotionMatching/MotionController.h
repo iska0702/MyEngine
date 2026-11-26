@@ -6,6 +6,7 @@
 #include "../SkinnedMesh.h"
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace EngineAnim {
 
@@ -47,6 +48,7 @@ public:
     float maxSprintSpeed = 8.0f;
     float searchInterval = 0.10f; // seconds
     float transitionDuration = 0.15f; // seconds
+    std::unordered_map<std::string, float> clipTransitionDurations;
 
     MotionWeights weights;
     MotionBoneMapping boneMapping;

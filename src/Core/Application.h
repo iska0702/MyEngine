@@ -37,6 +37,7 @@ public:
     void SetBenchmarkAntialiasing(int mode) { m_benchmarkAntialiasing = mode; }
     void SetBenchmarkXeFG(bool enabled) { m_benchmarkXeFG=enabled; }
     void SetBenchmarkRR(bool enabled) { m_benchmarkRR=enabled; }
+    void SetBenchmarkNoRR(bool enabled) { m_benchmarkNoRR=enabled; }
     void SetBenchmarkFSRFG(bool enabled) { m_benchmarkFSRFG=enabled; }
     void SetBenchmarkLatency(int mode) { m_benchmarkLatency=mode; }
     void SetBenchmarkUpscaler(int technique, int quality, bool pathTracing) {
@@ -69,6 +70,15 @@ private:
     std::unique_ptr<Camera> m_camera;
     std::unique_ptr<Sequencer> m_sequencer;
     float m_fps = 0.0f;
+    int m_targetFps = 60;
+    int m_minimumRenderScale = 50;
+    bool m_limitFrameRate = false;
+    bool m_dynamicResolutionEnabled = false;
+    double m_worldMinutes = 720.0;
+    bool m_worldClockEnabled = false;
+    bool m_worldClockRunning = false;
+    int m_worldTimeHour = 12;
+    int m_worldTimeMinute = 0;
     unsigned m_benchmarkFrameLimit = 0;
     bool m_benchmarkDisableVSync = false;
     bool m_benchmarkDisableRayTracing = false;
@@ -84,7 +94,7 @@ private:
     int m_benchmarkAntialiasing = -1;
     int m_benchmarkLatency = -1;
     bool m_benchmarkFSRFG=false,m_benchmarkXeFG=false;
-    bool m_benchmarkRR=false;
+    bool m_benchmarkRR=false, m_benchmarkNoRR=false;
     int m_benchmarkUpscaler = -1, m_benchmarkQuality = 1;
     bool m_benchmarkPathTracing = false;
 };

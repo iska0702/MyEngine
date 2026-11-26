@@ -10,6 +10,7 @@ inline void DrawSettings(bool& visible,HWND owner,const std::function<bool()>& s
     static bool wasVisible=false;
     if(!visible||!active){wasVisible=false;return;}
     if(!wasVisible || draft.file!=current.file)draft=current;
+    draft.hud=current.hud;
     wasVisible=true;
     ImGui::SetNextWindowSize(ImVec2(680,640),ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSizeConstraints(ImVec2(560,300),ImVec2(10000,10000));

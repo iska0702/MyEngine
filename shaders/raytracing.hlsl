@@ -185,7 +185,12 @@ void RayGen()
     // PATH TRACING MODE
     if (Constants.pathTracingEnabled != 0)
     {
-        uint seed = (launchIndex.x + launchIndex.y * (uint)dims.x) ^ Hash((uint)Constants.frameIndex);
+        float3 accumulatedRadiance = 0;
+        float accumulatedSpecularDistance = 0;
+        uint specularDistanceSamples = 0;
+        const int sampleCount = clamp(Constants.samplesPerPixel, 1, 8);
+        [loop] for (int sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
+        uint seed = Hash(launchIndex.x + launchIndex.y * (uint)dims.x) ^ Hash((uint)Constants.frameIndex) ^ Hash((uint)sampleIndex + 17u);
         float3 throughput = float3(1.0f, 1.0f, 1.0f);
         float3 radiance = float3(0.0f, 0.0f, 0.0f);
         
@@ -218,9 +223,12 @@ void RayGen()
             sunRay.TMin = 0.01f;
             sunRay.TMax = 1000.0f;
             ShadowPayload sPayload;
-            sPayload.hit = true;
-            TraceRay(Scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 1, sunRay, sPayload);
-            
+            sPayload.hit = false;
+            if (Constants.shadowsEnabled != 0) {
+                sPayload.hit = true;
+                TraceRay(Scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 1, sunRay, sPayload);
+            }
+
             float NdotL = max(dot(hitPayload.hitNormal, sunDir), 0.0f);
             if (!sPayload.hit)
             {
@@ -264,8 +272,14 @@ void RayGen()
             curRay.TMax = 2000.0f;
         }
 
-        RenderTarget[launchIndex] = float4(clamp(radiance, 0.0f, 16.0f), 1.0f);
-        SpecularHitDistance[launchIndex]=firstSpecularDistance;
+        accumulatedRadiance += radiance;
+        if (firstSpecularDistance > 0) {
+            accumulatedSpecularDistance += firstSpecularDistance;
+            ++specularDistanceSamples;
+        }
+        }
+        RenderTarget[launchIndex] = float4(clamp(accumulatedRadiance / sampleCount, 0.0f, 16.0f), 1.0f);
+        SpecularHitDistance[launchIndex] = specularDistanceSamples > 0 ? accumulatedSpecularDistance / specularDistanceSamples : 0;
         return;
     }
 
@@ -557,7 +571,9 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     // Terminal GI rays return direct lighting only: no unoccluded ambient leaks through walls.
     if(payload.recursionDepth==3)ambient=0;
     if(payload.recursionDepth==0&&Constants.pad1>0){
-        uint seed=Hash(DispatchRaysIndex().x+DispatchRaysIndex().y*DispatchRaysDimensions().x)^Hash(uint(Constants.frameIndex));
+        uint seed=Hash(DispatchRaysIndex().x+DispatchRaysIndex().y*DispatchRaysDimensions().x);
+        // Vary samples only when temporal history is available to accumulate them.
+        if (Constants.pad2 > .5f) seed ^= Hash(uint(Constants.frameIndex));
         float3 incident=0;
         // Stratified cosine samples cover the hemisphere without random clumps.
         // Keep the pattern stable in world lighting when temporal AA/RR is disabled.
@@ -572,7 +588,7 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
             RayDesc giRay;giRay.Origin=worldPos+normal*.01f;giRay.Direction=direction;giRay.TMin=.002f;giRay.TMax=2000;
             RayPayload gi;gi.color=0;gi.recursionDepth=3;gi.isHit=false;
             TraceRay(Scene,RAY_FLAG_FORCE_OPAQUE,0xFF,0,0,0,giRay,gi);
-            incident+=gi.isHit?gi.color.rgb:EnvironmentSky(direction,Constants.lightDir.xyz,Constants.lightColor.rgb,false);
+            incident+=min(gi.isHit?gi.color.rgb:EnvironmentSky(direction,Constants.lightDir.xyz,Constants.lightColor.rgb,false),2.f);
         }
         ambient=diffuseAlbedo*(incident/float(giSamples))*ao*Constants.pad1;
         if(Constants.pad2>.5f){

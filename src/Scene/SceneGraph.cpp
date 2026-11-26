@@ -1,3 +1,5 @@
+#include <string_view>
+#include <unordered_map>
 #include "SceneGraph.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Camera.h"
@@ -141,6 +143,20 @@ void SceneGraph::SyncWithRenderer(Renderer* renderer,bool force) {
     auto& pointLights = renderer->GetPointLights();
     auto& spotLights = renderer->GetSpotLights();
 
+    // Preserve the first match in scene order for legacy name-based links.
+    auto indexModels = [](const auto& list) {
+        std::pair<std::unordered_map<uint32_t, size_t>, std::unordered_map<std::string_view, size_t>> index;
+        index.first.reserve(list.size());
+        index.second.reserve(list.size());
+        for (size_t i = 0; i < list.size(); ++i) {
+            index.first.try_emplace(list[i].modelId, i);
+            index.second.try_emplace(list[i].name, i);
+        }
+        return index;
+    };
+    const auto staticIndex = indexModels(models);
+    const auto dynamicIndex = indexModels(dynModels);
+
     for (const auto& pair : m_allNodes) {
         auto node = pair.second;
         if (!node || !node->IsActive()) continue;
@@ -151,25 +167,20 @@ void SceneGraph::SyncWithRenderer(Renderer* renderer,bool force) {
 
         for (const auto& comp : node->GetComponents()) {
             if (auto meshComp = std::dynamic_pointer_cast<MeshComponent>(comp)) {
-                if (meshComp->isDynamic) {
-                    for (auto& dm : dynModels) {
-                        if (dm.modelId == meshComp->modelId || dm.name == meshComp->modelName) {
-                            if(!force&&(dm.physicsBodyType==2||dm.gameplay.door))break;
-                            dm.worldMatrix = wMat;
-                            Transform::Decompose(XMLoadFloat4x4(&wMat),dm.position,dm.rotation,dm.scale);
-                            break;
-                        }
-                    }
-                } else {
-                    for (auto& m : models) {
-                        if (m.modelId == meshComp->modelId || m.name == meshComp->modelName) {
-                            if(!force&&(m.physicsBodyType==2||m.gameplay.door))break;
-                            m.worldMatrix = wMat;
-                            Transform::Decompose(XMLoadFloat4x4(&wMat),m.position,m.rotation,m.scale);
-                            break;
-                        }
-                    }
-                }
+                auto syncModel = [&](auto& list, const auto& index) {
+                    size_t position = list.size();
+                    if (auto id = index.first.find(meshComp->modelId); id != index.first.end())
+                        position = id->second;
+                    if (auto name = index.second.find(meshComp->modelName); name != index.second.end())
+                        position = (std::min)(position, name->second);
+                    if (position == list.size()) return;
+                    auto& model = list[position];
+                    if (!force && (model.physicsBodyType == 2 || model.gameplay.door)) return;
+                    model.worldMatrix = wMat;
+                    Transform::Decompose(XMLoadFloat4x4(&wMat), model.position, model.rotation, model.scale);
+                };
+                if (meshComp->isDynamic) syncModel(dynModels, dynamicIndex);
+                else syncModel(models, staticIndex);
             } else if (auto plComp = std::dynamic_pointer_cast<PointLightComponent>(comp)) {
                 if (plComp->lightIndex >= 0 && plComp->lightIndex < (int)pointLights.size()) {
                     pointLights[plComp->lightIndex].position = XMFLOAT3(

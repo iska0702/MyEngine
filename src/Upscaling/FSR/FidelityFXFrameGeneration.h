@@ -32,7 +32,8 @@ public:
             wchar_t executable[32768]{};GetModuleFileNameW(nullptr,executable,32768);
             auto path=std::filesystem::path(executable).parent_path()/L"ThirdParty/AMD/amd_fidelityfx_dx12.dll";
             module=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-            if(!module)return false;ffxLoadFunctions(&api,module);
+            if(!module){EngineLog::Write("[FSR FG] DLL load failed: "+std::to_string(GetLastError()));return false;}
+            ffxLoadFunctions(&api,module);
             if(!api.CreateContext||!api.DestroyContext||!api.Configure||!api.Dispatch)return false;
         }
         backend={};backend.header.type=FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;backend.device=device;
@@ -54,6 +55,9 @@ public:
         if(result!=FFX_API_RETURN_OK){context=nullptr;EngineLog::Write("[FSR FG] Context creation failed: "+std::to_string(result));return false;}
         EngineLog::Write("[FSR FG] Interpolation swapchain and context ready (2x).");return true;
     }
+    bool MatchesDisplaySize(uint32_t width, uint32_t height) const {
+        return context && create.displaySize.width == width && create.displaySize.height == height;
+    }
     IDXGISwapChain4* SwapChain()const{return proxy.Get();}
     uint64_t GeneratedFrames()const{return generated.load();}
     void Wait(){if(swapContext){ffxDispatchDescFrameGenerationSwapChainWaitForPresentsDX12 wait{};wait.header.type=FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATIONSWAPCHAIN_WAIT_FOR_PRESENTS_DX12;api.Dispatch(&swapContext,&wait.header);}}
@@ -71,7 +75,8 @@ public:
         config.frameGenerationCallback=Generate;config.frameGenerationCallbackUserContext=this;
         config.HUDLessColor=ffxApiGetResourceDX12(hudless,FFX_API_RESOURCE_STATE_COMPUTE_READ);
         config.generationRect={0,0,int32_t(create.displaySize.width),int32_t(create.displaySize.height)};config.frameID=frame;
-        if(api.Configure(&context,&config.header)!=FFX_API_RETURN_OK)return false;
+        const auto configResult=api.Configure(&context,&config.header);
+        if(configResult!=FFX_API_RETURN_OK){EngineLog::Write("[FSR FG] Configure failed: "+std::to_string(configResult));Disable();return false;}
         enabled=true;
         ffxDispatchDescFrameGenerationPrepareCameraInfo camera{};camera.header.type=FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_CAMERAINFO;
         memcpy(camera.cameraPosition,position,12);memcpy(camera.cameraRight,right,12);memcpy(camera.cameraUp,up,12);memcpy(camera.cameraForward,forward,12);

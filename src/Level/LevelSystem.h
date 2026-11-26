@@ -14,6 +14,7 @@
 
 #include "Renderer/Common/RenderTypes.h"
 #include "Physics/VehicleSettings.h"
+#include "Scene/GameplaySettings.h"
 #include "Physics/ColliderData.h"
 #include "Physics/RagdollSettings.h"
 
@@ -55,6 +56,7 @@ struct LevelEntity {
     EnginePhysics::ColliderSettings collider;
     EnginePhysics::RagdollSettings ragdollSettings;
     EnginePhysics::VehicleSettings vehicle;
+    EngineScene::GameplaySettings gameplay;
     int physicsShapeType = 0;  // 0=Box, 1=Sphere, 2=Capsule, 3=Plane, 4=ConvexMesh, 5=TriangleMesh
     float physicsMass = 10.0f;
     float physicsLinearDamping=.05f,physicsAngularDamping=.05f;

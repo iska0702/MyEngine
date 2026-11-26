@@ -27,7 +27,7 @@ class FidelityFXSystem {
     }
 public:
     ~FidelityFXSystem(){Shutdown();if(module)FreeLibrary(module);}
-    bool Initialize(ID3D12Device* device,uint32_t width,uint32_t height) {
+    bool Initialize(ID3D12Device* device,uint32_t width,uint32_t height,bool dynamicResolution) {
         Shutdown();
         if(!module){
             wchar_t executable[32768]{};GetModuleFileNameW(nullptr,executable,32768);
@@ -41,6 +41,7 @@ public:
         backend={};backend.header.type=FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;backend.device=device;
         create={};create.header.type=FFX_API_CREATE_CONTEXT_DESC_TYPE_UPSCALE;create.header.pNext=&backend.header;
         create.flags=FFX_UPSCALE_ENABLE_HIGH_DYNAMIC_RANGE|FFX_UPSCALE_ENABLE_AUTO_EXPOSURE;
+        if (dynamicResolution) create.flags |= FFX_UPSCALE_ENABLE_DYNAMIC_RESOLUTION;
         create.maxRenderSize={width,height};create.maxUpscaleSize={width,height};create.fpMessage=Message;
         const auto result=api.CreateContext(&context,&create.header,nullptr);
         if(result!=FFX_API_RETURN_OK){Message(0,L"Context creation failed");context=nullptr;return false;}

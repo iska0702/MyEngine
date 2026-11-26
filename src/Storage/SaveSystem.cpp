@@ -30,15 +30,16 @@ std::string SaveManager::GetSaveFilePath(const std::string& saveSlotName) {
         auto file=EngineProject::current.Root()/"Saved/Recovery"/saveSlotName;
         std::filesystem::create_directories(file.parent_path());return EngineProject::Utf8(file);
     }
-    if(EngineProject::active && saveSlotName=="Save1.save"){
+    if(EngineProject::active && (saveSlotName=="Save1.save" || saveSlotName=="QuestProgress.save")){
 #if defined(ENGINE_RELEASE)
+        const char* runtimeFile = saveSlotName == "QuestProgress.save" ? "Saved/QuestProgress.save" : "Saved/Runtime.save";
 #if defined(_WIN32)
-        auto file=(EngineProject::runtimeUserRoot.empty()?EngineProject::current.Root():EngineProject::runtimeUserRoot)/"Saved/Runtime.save";
+        auto file=(EngineProject::runtimeUserRoot.empty()?EngineProject::current.Root():EngineProject::runtimeUserRoot)/runtimeFile;
 #else
-        auto file=EngineProject::current.Root()/"Saved/Runtime.save";
+        auto file=EngineProject::current.Root()/runtimeFile;
 #endif
 #else
-        auto file=EngineProject::current.Resolve(EngineProject::current.editorScene);
+        auto file=EngineProject::current.Resolve(saveSlotName == "QuestProgress.save" ? "Saved/QuestProgress.save" : EngineProject::current.editorScene);
 #endif
         std::filesystem::create_directories(file.parent_path());return EngineProject::Utf8(file);
     }

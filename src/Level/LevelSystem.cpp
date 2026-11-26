@@ -121,6 +121,7 @@ std::string LevelData::Serialize() const {
         EnginePhysics::WriteCollider(ss, e.collider);
         EnginePhysics::WriteRagdoll(ss, e.ragdollSettings);
         EnginePhysics::WriteVehicle(ss, e.vehicle);
+        EngineScene::WriteGameplay(ss, e.gameplay);
         ss << "PHYSICS_BODY " << e.physicsBodyType << "\n";
         ss << "PHYSICS_SHAPE " << e.physicsShapeType << "\n";
         ss << "PHYSICS_MASS " << e.physicsMass << "\n";
@@ -246,6 +247,10 @@ bool LevelData::Deserialize(const std::string& text) {
             else if (EnginePhysics::ReadCollider(tag, iss, currentEntity.collider)) {}
             else if (EnginePhysics::ReadRagdoll(tag, iss, currentEntity.ragdollSettings)) {}
             else if (EnginePhysics::ReadVehicle(tag, iss, currentEntity.vehicle)) {}
+            else if (tag == "GAMEPLAY") {
+                if (!EngineScene::ReadGameplay(iss, currentEntity.gameplay))
+                    throw std::runtime_error("Invalid gameplay settings");
+            }
             else if (tag == "PHYSICS_BODY") iss >> currentEntity.physicsBodyType;
             else if (tag == "PHYSICS_SHAPE") iss >> currentEntity.physicsShapeType;
             else if (tag == "PHYSICS_MASS") iss >> currentEntity.physicsMass;
@@ -458,6 +463,7 @@ void LevelSystem::ApplyLevelToScene(Renderer* renderer, Camera* camera) {
                     dm.material.aoPath = e.aoPath;
                     dm.material.emissivePath = e.emissivePath;
                     dm.collider = e.collider; dm.ragdollSettings = e.ragdollSettings;dm.vehicle=e.vehicle;
+                    dm.gameplay = e.gameplay;
                     dm.physicsBodyType = e.physicsBodyType;
                     dm.physicsShapeType = e.physicsShapeType;
                     dm.physicsMass = e.physicsMass; dm.physicsLinearDamping = e.physicsLinearDamping; dm.physicsAngularDamping = e.physicsAngularDamping;
@@ -494,6 +500,7 @@ void LevelSystem::ApplyLevelToScene(Renderer* renderer, Camera* camera) {
                     m.material.aoPath = e.aoPath;
                     m.material.emissivePath = e.emissivePath;
                     m.collider = e.collider; m.ragdollSettings = e.ragdollSettings;m.vehicle=e.vehicle;
+                    m.gameplay = e.gameplay;
                     m.physicsBodyType = e.physicsBodyType;
                     m.physicsShapeType = e.physicsShapeType;
                     m.physicsMass = e.physicsMass; m.physicsLinearDamping = e.physicsLinearDamping; m.physicsAngularDamping = e.physicsAngularDamping;
@@ -707,6 +714,7 @@ void LevelSystem::SyncSceneToLevelData(Renderer* renderer, Camera* camera) {
             e.aoPath = m.material.aoPath;
             e.emissivePath = m.material.emissivePath;
             e.collider = m.collider; e.ragdollSettings = m.ragdollSettings;e.vehicle=m.vehicle;
+            e.gameplay = m.gameplay;
             e.physicsBodyType = m.physicsBodyType;
             e.physicsShapeType = m.physicsShapeType;
             e.physicsMass = m.physicsMass; e.physicsLinearDamping = m.physicsLinearDamping; e.physicsAngularDamping = m.physicsAngularDamping;
@@ -738,6 +746,7 @@ void LevelSystem::SyncSceneToLevelData(Renderer* renderer, Camera* camera) {
             e.albedoPath = dm.material.albedoPath; e.normalPath = dm.material.normalPath;
             e.rmaPath = dm.material.rmaPath; e.aoPath = dm.material.aoPath; e.emissivePath = dm.material.emissivePath;
             e.collider = dm.collider; e.ragdollSettings = dm.ragdollSettings;e.vehicle=dm.vehicle;
+            e.gameplay = dm.gameplay;
             e.physicsBodyType = dm.physicsBodyType; e.physicsShapeType = dm.physicsShapeType;
             e.physicsMass = dm.physicsMass; e.physicsLinearDamping = dm.physicsLinearDamping; e.physicsAngularDamping = dm.physicsAngularDamping; e.physicsFriction = dm.physicsFriction; e.physicsRestitution = dm.physicsRestitution;
             e.physicsEnableGravity = dm.physicsEnableGravity; e.physicsEnableCCD = dm.physicsEnableCCD;

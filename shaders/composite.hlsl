@@ -112,14 +112,20 @@ float4 PSMain(VertexOut pin) : SV_Target {
             // Composite model matrix contains the inverse jittered view-projection.
             float4 world=mul(float4(uv*float2(2,-2)+float2(-1,1),depth,1),g_Constants.model);
             float3 position=world.xyz/world.w;
-            float cloud=GetCloudShadow(position,g_Constants.lightDir,g_Constants.cloudTime,g_Constants.cloudDensity);
-            float3 ambient=DiffuseEnvironment(normal,diffuse.rgb,g_Constants.lightDir,g_Constants.lightColor)*diffuse.a*lerp(.70f,1.f,cloud);
-            float ao=saturate(ssao);
-            // AO affects indirect diffuse; preserve direct lamps and emission.
-            color-=min(scene,ambient)*(1-ao);
+            float ao = saturate(ssao);
+            // DXR replaces the raster color, and fully unoccluded pixels need no subtraction.
+            [branch] if (rt.a <= 0.5f && ao < 1.0f) {
+                float cloud = GetCloudShadow(position, g_Constants.lightDir, g_Constants.cloudTime, g_Constants.cloudDensity);
+                float3 ambient = DiffuseEnvironment(normal, diffuse.rgb, g_Constants.lightDir, g_Constants.lightColor)
+                    * diffuse.a * lerp(.70f, 1.f, cloud);
+                color -= min(scene, ambient) * (1.0f - ao);
+            }
+            if (g_Constants.padLights2 > 0.5f) {
             float3 filtered=0;float weightSum=0;
-            int radius=rt.a>.5f?4:1;
-            int stride=1;
+            int radius=4;
+            // Cover a wider screen-space area without increasing texture fetches.
+            // The depth, normal and albedo weights still stop cross-edge bleeding.
+            int stride=2;
             [loop]for(int y=-radius;y<=radius;++y)[loop]for(int x=-radius;x<=radius;++x){
                 int2 p=clamp(pixel+int2(x,y)*stride,int2(0,0),int2(g_Constants.screenRes)-1);
                 float d=gDepth.Load(int3(p,0));float3 n=gNormal.Load(int3(p,0)).xyz;
@@ -132,6 +138,7 @@ float4 PSMain(VertexOut pin) : SV_Target {
                 filtered+=gSSGI.Load(int3(p,0)).rgb*weight;weightSum+=weight;
             }
             indirect=filtered/max(weightSum,.0001f);
+            }
             color+=indirect*ao;
         }
     }

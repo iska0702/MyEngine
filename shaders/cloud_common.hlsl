@@ -28,38 +28,37 @@ float CloudFbm(float3 p) {
 
 float2 CloudLayerBounds(float density) {
     float storm = saturate((density - 0.85f) / 1.80f);
-    float base = lerp(1400.0f, 1000.0f, storm);
-    return float2(base, base + lerp(650.0f, 900.0f, storm));
+    float base = lerp(850.0f, 550.0f, storm);
+    return float2(base, base + lerp(1000.0f, 1350.0f, storm));
 }
 
 // Shared by visible clouds and surface lighting: same shape, wind and extinction.
 static const float CloudExtinction = 0.0075f;
 // Weather-scale coverage and height profile are shared with raster/DXR shadows.
 float SampleCloudBody(float3 p, float time, float density) {
-    float2 layer=CloudLayerBounds(density);
-    float h=(p.y-layer.x)/(layer.y-layer.x);
-    if(h<=0 || h>=1 || density<=0) return 0;
-    float storm=saturate((density-.85)/1.8);
-    p.xz+=time*float2(1.5+storm*3.5,.6+storm*1.4);
-    float weather=CloudNoise(float3(p.x*.00028,0,p.z*.00028));
-    float coverage=lerp(.46,.83,storm)+(weather-.5)*.32;
-    float3 q=p*.0017;
-    // Rounded billows over broad, flatter condensation bases.
-    float billow=CloudNoise(q)*.65+CloudNoise(q*2.03+13.7)*.35;
-    float shape=saturate((billow-(1-coverage))*3.5);
-    float top=lerp(.52,.98,saturate(weather*1.3));
-    float profile=smoothstep(0,.08,h)*(1-smoothstep(top*.55,top,h));
-    return shape*profile*density*1.8;
+    float2 layer = CloudLayerBounds(density);
+    float h = (p.y - layer.x) / (layer.y - layer.x);
+    if (h <= 0 || h >= 1 || density <= 0) return 0;
+    float storm = saturate((density - 0.85) / 1.8);
+    float2 wind = time * float2(4.0 + 4.0 * storm, 1.6 + 2.0 * storm);
+    float2 xz = p.xz + wind;
+    float weather = CloudNoise(float3(xz * 0.00024, 11.0).xzy);
+    float coverage = saturate(0.40 + density * 0.15 + (weather - 0.5) * 0.55);
+    float3 q = float3(xz.x * 0.0012, h * 2.8, xz.y * 0.0012);
+    float billow = CloudNoise(q) * 0.62 + CloudNoise(q * 2.07 + 17.3) * 0.26
+                 + CloudNoise(q * 4.11 + 37.1) * 0.12;
+    float profile = smoothstep(0.0, 0.10, h) * (1.0 - smoothstep(0.58, 1.0, h));
+    float threshold = 0.63 - coverage * 0.35 + (1.0 - profile) * 0.22;
+    return saturate((billow - threshold) * 3.4) * profile * density * 1.45;
 }
 float SampleCloudDensity(float3 p, float time, float density) {
-    float body=SampleCloudBody(p,time,density);
-    if(body<=.001) return 0;
-    float storm=saturate((density-.85)/1.8);
-    float3 q=p+float3(time*(1.5+storm*3.5),0,time*(.6+storm*1.4));
-    float detail=CloudNoise(q*.009)*.65+CloudNoise(q*.021+27.3)*.35;
-    // Fine erosion is strongest at the silhouette, keeping dense interiors intact.
-    float edge=1-saturate(body/max(density,.01));
-    return max(0,body-(1-detail)*edge*.32*density);
+    float body = SampleCloudBody(p, time, density);
+    if (body <= 0.001) return 0;
+    float storm = saturate((density - 0.85) / 1.8);
+    float3 q = p + float3(time * (4.0 + 4.0 * storm), 0, time * (1.6 + 2.0 * storm));
+    float erosion = CloudNoise(q * 0.006) * 0.7 + CloudNoise(q * 0.015 + 27.3) * 0.3;
+    float edge = 1.0 - saturate(body / max(density, 0.01));
+    return max(0, body - (1.0 - erosion) * edge * 0.26 * density);
 }
 
 float GetCloudShadow(float3 worldPos, float3 lightDir, float time, float density) {

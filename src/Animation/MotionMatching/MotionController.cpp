@@ -162,6 +162,9 @@ void MotionController::Update(
         const auto& targetFrame = m_database->GetFrame(m_currentFrameIndex);
         m_debugStats.currentAnimName = m_database->GetAnimationName(targetFrame.animIndex);
         m_debugStats.currentFrame = m_currentFrameIndex;
+        const auto customBlend = clipTransitionDurations.find(m_debugStats.currentAnimName);
+        m_debugStats.blendDuration = customBlend == clipTransitionDurations.end()
+            ? transitionDuration : customBlend->second;
 
         // Apply inertialized blending
         MotionMatcher::InertializeUpdate(
@@ -169,7 +172,7 @@ void MotionController::Update(
             m_inOutOffsets,
             m_inOutOffsetVels,
             targetFrame.localTransforms,
-            transitionDuration,
+            m_debugStats.blendDuration,
             dt
         );
 

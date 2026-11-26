@@ -137,18 +137,16 @@ inline void DrawAntiAliasingControls(Renderer& renderer) {
         }
         ImGui::EndCombo();
     }
-    if (selected >= 2) {
-        ImGui::TextWrapped("Native AA renders at display resolution. It improves edges without reducing render resolution.");
-        const bool active = selected == 2 ? renderer.IsDLSSActive() : selected == 3 ? renderer.IsXeSSActive() : renderer.IsFSRActive();
-        ImGui::Text("SDK evaluation: %s", active ? "active" : "pending / unavailable");
-    }
-    if (renderer.GetUpscaleTechnique() == UpscaleTechnique::DLSS) {
+    if (technique != UpscaleTechnique::None) {
         int quality = static_cast<int>(renderer.GetUpscaleQuality());
-        if (quality < 0 || quality > 4) quality = 1;
-        const char* modes[] = {"DLAA (native)", "Quality", "Balanced", "Performance", "Ultra Performance"};
-        if (ImGui::Combo("DLSS quality", &quality, modes, IM_ARRAYSIZE(modes)))
+        const char* modes[] = {"Native AA", "Quality", "Balanced", "Performance", "Ultra Performance"};
+        const char* label = technique == UpscaleTechnique::DLSS ? "DLSS quality" :
+            technique == UpscaleTechnique::FSR ? "FSR quality" : "XeSS quality";
+        if (ImGui::Combo(label, &quality, modes, IM_ARRAYSIZE(modes)))
             renderer.SetUpscaleQuality(static_cast<UpscaleQuality>(quality));
-        ImGui::TextDisabled("Changing quality recreates the render targets.");
+        const bool active = technique == UpscaleTechnique::DLSS ? renderer.IsDLSSActive() :
+            technique == UpscaleTechnique::FSR ? renderer.IsFSRActive() : renderer.IsXeSSActive();
+        ImGui::Text("SDK evaluation: %s", active ? "active" : "pending / unavailable");
     }
 }
 }

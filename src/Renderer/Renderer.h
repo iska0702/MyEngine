@@ -1,4 +1,5 @@
 #pragma once
+#include "DynamicResolution.h"
 #include <array>
 #include <unordered_map>
 #include "Scene/GameplaySettings.h"
@@ -56,9 +57,11 @@ namespace EngineRender {
 #endif
 
 namespace EngineRender {
+    class DLSSSystem;
     class XeSSSystem;
     class FidelityFXSystem;
     class FidelityFXFrameGeneration;
+    class DXRSystem;
 }
 
 namespace EngineStorage {
@@ -418,13 +421,17 @@ public:
     bool IsXeLLEnabled() const { return m_xellEnabled; }
     void SetXeLLEnabled(bool enabled, bool boost = false);
 #if defined(_WIN32)
+    EngineRender::DLSSSystem* GetDLSSSystem() const { return m_dlssSystem.get(); }
     EngineRender::XeSSSystem* GetXeSSSystem() const { return m_xessSystem.get(); }
+    EngineRender::DXRSystem* GetDXRSystem() const { return m_dxrSystem.get(); }
     bool IsDirectStorageSupported() const;
     EngineStorage::DirectStorageSystem* GetDirectStorage() const { return m_directStorage.get(); }
 #endif
 
     bool IsPathTracingEnabled() const { return m_pathTracingEnabled; }
     void SetPathTracingEnabled(bool enabled) { m_pathTracingEnabled = enabled; InvalidateRaytracingScene(); }
+    int GetPathTracingSamples() const { return m_ptSamplesPerPixel; }
+    void SetPathTracingSamples(int samples) { m_ptSamplesPerPixel = (std::clamp)(samples, 1, 8); }
     int GetPathTracingBounces() const { return m_ptMaxBounces; }
     void SetPathTracingBounces(int bounces) { m_ptMaxBounces = (std::clamp)(bounces, 1, 4); }
     bool m_ssaoEnabled = true;
@@ -611,6 +618,10 @@ public:
     TextureStreamer* GetTextureStreamer() const { return m_textureStreamer.get(); }
 
     UpscaleTechnique GetUpscaleTechnique() const { return m_upscaleTechnique; }
+#if defined(_WIN32)
+    void UpdateDynamicResolution(bool enabled, int targetFps, int minimumScale, float dt);
+    bool IsDynamicResolutionActive() const { return m_dynamicResolutionActive; }
+#endif
     void SetUpscaleTechnique(UpscaleTechnique technique) { 
         if (m_upscaleTechnique != technique) {
             m_upscaleTechnique = technique; 
@@ -662,6 +673,9 @@ public:
     void SpawnSphere(const XMFLOAT3& pos);
     void SpawnTriangle(const XMFLOAT3& pos);
     void SpawnDynamicRenderModel(const char* filepath, const XMFLOAT3& pos);
+#if defined(_WIN32)
+    bool ReimportDynamicModel(uint32_t modelId);
+#endif
     uint32_t CreateDynamicClothModel(const std::string& name, const std::vector<Renderer::Vertex>& vertices, const std::vector<uint32_t>& indices, const PBRMaterial& material);
     bool UpdateDynamicModelVertexBuffer(uint32_t modelId, const std::vector<Renderer::Vertex>& vertices);
     bool UpdateDynamicModelTopology(uint32_t modelId, const std::vector<Renderer::Vertex>& vertices, const std::vector<uint32_t>& indices);
@@ -739,6 +753,10 @@ public:
     int GetDLSSGMaxMultiplier() const { return m_dlssGMaxMultiplier; }
     int GetDLSSGStatus() const { return m_dlssGStatus; }
     uint64_t GetDLSSGGeneratedFrames() const { return m_dlssGeneratedFrames; }
+#if defined(_WIN32)
+    uint64_t GetGeneratedFrameCount() const;
+    bool IsFrameGenerationRequested() const { return m_dlssGRequested || m_fsrFrameGenEnabled || m_xessFrameGenEnabled; }
+#endif
     void SetDLSSGActive(bool active) { m_dlssGRequested=active&&IsDLSSGSupported(); if(m_dlssGRequested){m_fsrFrameGenEnabled=false;m_xessFrameGenEnabled=false;} }
     int GetDLSSGMultiplier() const { return m_dlssGMultiplier; }
     void SetDLSSGMultiplier(int mult) { m_dlssGMultiplier = (std::clamp)(mult, 2, (std::max)(2,m_dlssGMaxMultiplier)); }
@@ -761,8 +779,9 @@ public:
         SetDLSSRayReconstructionVersion(active ? DLSSRRVersion::Version2_0 : DLSSRRVersion::Off);
     }
 
+    const char* GetFSRFrameGenStatus() const { return m_fsrFrameGenStatus; }
     bool IsFSRFrameGenEnabled() const { return m_fsrFrameGenEnabled; }
-    void SetFSRFrameGenEnabled(bool enabled) { m_fsrFrameGenEnabled = enabled&&IsFrameGenerationIntegrated(); if(enabled){m_xessFrameGenEnabled=false;m_dlssGRequested=false;} }
+    void SetFSRFrameGenEnabled(bool enabled) { m_fsrFrameGenEnabled = enabled&&IsFrameGenerationIntegrated(); m_fsrFrameGenStatus = m_fsrFrameGenEnabled ? "Starting" : "Off"; if(enabled){m_xessFrameGenEnabled=false;m_dlssGRequested=false;} }
     bool IsFSRFrameGenActive() const { return m_fsrFrameGenActive; }
     int GetFSRFrameGenMultiplier() const { return m_fsrFrameGenMultiplier; }
     void SetFSRFrameGenMultiplier(int) { m_fsrFrameGenMultiplier = 2; }
@@ -878,6 +897,10 @@ private:
     ComPtr<ID3D12GraphicsCommandList6> m_commandList;
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     ComPtr<ID3D12Resource> m_shadowMapTexture;
+    ComPtr<ID3D12Resource> m_spotShadowMap;
+    ComPtr<ID3D12Resource> m_pointShadowMap;
+    D3D12_RESOURCE_STATES m_pointShadowState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    D3D12_RESOURCE_STATES m_spotShadowState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     D3D12_RESOURCE_STATES m_shadowMapState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     UINT m_rtvDescriptorSize;
     UINT m_dsvDescriptorSize;
@@ -992,6 +1015,9 @@ private:
     XMFLOAT3 m_skyColor;
 
     std::vector<RenderModel> m_models;
+#if defined(_WIN32)
+    bool LoadDynamicRenderModel(const char* filepath, const XMFLOAT3& pos, RenderDynamicModel* existing);
+#endif
     std::vector<RenderDynamicModel> m_dynamicModels;
 
 #if defined(_WIN32)
@@ -1173,6 +1199,10 @@ private:
     uint32_t m_cubeNumLODs = 1;
 
     UpscaleTechnique m_upscaleTechnique = UpscaleTechnique::None;
+#if defined(_WIN32)
+    bool m_dynamicResolutionActive = false;
+    EngineRender::DynamicResolution m_dynamicResolution;
+#endif
     UpscaleQuality m_upscaleQuality = UpscaleQuality::Quality;
     float m_upscaleSharpness = 0.5f;
     bool m_vsyncEnabled = true;
@@ -1204,6 +1234,7 @@ private:
     bool m_dlssRRSupported = false;
     bool m_dlssRRActive = false;
     DLSSRRVersion m_dlssRRVersion = DLSSRRVersion::Off;
+    const char* m_fsrFrameGenStatus = "Off";
     bool m_fsrFrameGenEnabled = false;
     int  m_fsrFrameGenMultiplier = 2;
     bool m_xessSupported = false;
@@ -1295,7 +1326,9 @@ private:
     UINT8*                      m_pFsrCbvDataBegin = nullptr;
     bool                        m_fsr2Initialized = false;
 
+    std::unique_ptr<EngineRender::DLSSSystem> m_dlssSystem;
     std::unique_ptr<EngineRender::XeSSSystem> m_xessSystem;
+    std::unique_ptr<EngineRender::DXRSystem>  m_dxrSystem;
     std::unique_ptr<EngineRender::FidelityFXSystem> m_fidelityFX;
     std::unique_ptr<EngineRender::FidelityFXFrameGeneration> m_fidelityFXFrameGeneration;
     ComPtr<ID3D12Resource> m_frameGenHudless;
@@ -1303,6 +1336,7 @@ private:
     int m_frameGenProxyProvider=0;
     bool m_xessFrameGenActive=false;
     uint64_t m_xessGeneratedFrames=0;
+    uint64_t m_retiredFSRGeneratedFrames=0;
     bool m_dlssGConfigured=false;
     uint64_t m_dlssGeneratedFrames=0,m_dlssGFenceValue=0;
     ComPtr<ID3D12Fence> m_dlssGFence;

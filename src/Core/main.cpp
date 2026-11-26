@@ -40,7 +40,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     int benchmarkAntialiasing = -1;
     int benchmarkLatency = -1;
     bool benchmarkFSRFG=false,benchmarkXeFG=false;
-    bool benchmarkRR=false;
+    bool benchmarkRR=false, benchmarkNoRR=false;
     int benchmarkUpscaler = -1, benchmarkQuality = 1;
     bool benchmarkPathTracing = false;
     float benchmarkClouds = -1.0f;
@@ -64,6 +64,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         else if (argument == L"--benchmark-gi") arguments >> benchmarkGI;
         else if (argument == L"--benchmark-aa") arguments >> benchmarkAntialiasing;
         else if (argument == L"--benchmark-rr") benchmarkRR=true;
+        else if (argument == L"--benchmark-no-rr") benchmarkNoRR=true;
         else if (argument == L"--benchmark-xess-fg") benchmarkXeFG=true;
         else if (argument == L"--benchmark-fsr-fg") benchmarkFSRFG=true;
         else if (argument == L"--benchmark-latency") arguments >> benchmarkLatency;
@@ -226,6 +227,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     app.SetBenchmarkLatency(benchmarkLatency);
     app.SetBenchmarkFSRFG(benchmarkFSRFG);app.SetBenchmarkXeFG(benchmarkXeFG);
     app.SetBenchmarkRR(benchmarkRR);
+    app.SetBenchmarkNoRR(benchmarkNoRR);
     app.SetBenchmarkUpscaler(benchmarkUpscaler, benchmarkQuality, benchmarkPathTracing);
 #endif
 

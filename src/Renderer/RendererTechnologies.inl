@@ -3,13 +3,13 @@
 
 bool Renderer::InitFSR2(){
     if(!m_fidelityFX)m_fidelityFX=std::make_unique<EngineRender::FidelityFXSystem>();
-    m_fsr2Initialized=m_fidelityFX->Initialize(m_device.Get(),m_width,m_height);
+    m_fsr2Initialized=m_fidelityFX->Initialize(m_device.Get(),m_width,m_height,m_dynamicResolutionActive);
     m_fsrSupported=m_fsr2Initialized;return m_fsr2Initialized;
 }
 void Renderer::ShutdownFSR2(){if(m_fidelityFX)m_fidelityFX->Shutdown();m_fsr2Initialized=false;m_fsrActive=false;}
 bool Renderer::ApplyFSR2(ID3D12GraphicsCommandList* list){
     if(!m_fsr2Initialized||!m_fidelityFX)return false;
-    bool composite=(m_ssaoEnabled||(m_dxrEnabled&&m_dxrDevice))&&m_compositedColorTexture;
+    bool composite=(m_ssaoEnabled||m_ssgiEnabled||(m_dxrEnabled&&m_dxrDevice))&&m_compositedColorTexture;
     auto* color=composite?m_compositedColorTexture.Get():m_sceneColorTexture.Get();auto& state=composite?m_compositedColorState:m_sceneColorState;
     Transition(list,color,state,D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     Transition(list,m_depthStencilBuffer.Get(),m_depthStencilState,D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -25,8 +25,9 @@ bool Renderer::InitXeSS(){
 }
 void Renderer::ShutdownXeSS(){if(m_xessSystem)m_xessSystem->Shutdown();m_xessSystem.reset();m_xessSupported=false;m_xessActive=false;}
 void Renderer::ApplyXeSS(ID3D12GraphicsCommandList* list){
+    m_xessActive = false;
     if(!m_xessSystem||!m_xessSystem->IsInitialized())return;
-    bool composite=(m_ssaoEnabled||(m_dxrEnabled&&m_dxrDevice))&&m_compositedColorTexture;
+    bool composite=(m_ssaoEnabled||m_ssgiEnabled||(m_dxrEnabled&&m_dxrDevice))&&m_compositedColorTexture;
     auto* color=composite?m_compositedColorTexture.Get():m_sceneColorTexture.Get();auto& state=composite?m_compositedColorState:m_sceneColorState;
     Transition(list,color,state,D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);Transition(list,m_velocityTexture.Get(),m_velocityState,D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     Transition(list,m_depthStencilBuffer.Get(),m_depthStencilState,D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);Transition(list,m_upscaledColorTexture.Get(),m_upscaledColorState,D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -76,7 +77,7 @@ void Renderer::AttachStreamlinePresentation(){
 
 void Renderer::UpdateTechnologySwapChain(){
     int requested=m_fsrFrameGenEnabled?1:m_xessFrameGenEnabled?2:m_dlssGRequested?3:0;
-    const bool replace=(requested&&requested!=m_frameGenProxyProvider)||(m_frameGenProxyProvider==3&&!requested);
+    const bool replace=(requested&&requested!=m_frameGenProxyProvider)||(m_frameGenProxyProvider!=0&&!requested);
     if(replace){
         DXGI_SWAP_CHAIN_DESC1 desc{};m_swapChain->GetDesc1(&desc);
         ComPtr<IDXGIFactory2> factory;CreateDXGIFactory2(0,IID_PPV_ARGS(&factory));
@@ -85,12 +86,15 @@ void Renderer::UpdateTechnologySwapChain(){
         if(m_dlssGConfigured){sl::DLSSGOptions off{};off.mode=sl::DLSSGMode::eOff;slDLSSGSetOptions(sl::ViewportHandle{0},off);m_dlssGConfigured=false;}
         if(m_dlssGFence&&m_dlssGFenceValue)m_commandQueue->Wait(m_dlssGFence.Get(),m_dlssGFenceValue);
         WaitForPreviousFrame();for(auto& target:m_renderTargets)target.Reset();m_swapChain.Reset();
+        if (m_fidelityFXFrameGeneration) m_retiredFSRGeneratedFrames += m_fidelityFXFrameGeneration->GeneratedFrames();
         m_fidelityFXFrameGeneration.reset();if(m_xessSystem)m_xessSystem->ShutdownFrameGeneration();m_frameGenProxyProvider=0;
         if(requested==1){
             m_fidelityFXFrameGeneration=std::make_unique<EngineRender::FidelityFXFrameGeneration>();
             bool ready=m_fidelityFXFrameGeneration->Initialize(m_device.Get(),m_commandQueue.Get(),m_hwnd,desc,factory.Get(),m_width,m_height);
             if(auto* swap=m_fidelityFXFrameGeneration->SwapChain())swap->QueryInterface(IID_PPV_ARGS(&m_swapChain));
-            m_fsrFrameGenEnabled=ready;if(m_swapChain)m_frameGenProxyProvider=1;
+            m_fsrFrameGenEnabled=ready && m_swapChain.Get();
+            if (!m_fsrFrameGenEnabled) m_fsrFrameGenStatus="Initialization failed (see editor log)";
+            if(m_swapChain)m_frameGenProxyProvider=1;
         }else if(requested==2&&m_xessSystem){
             SetXeLLEnabled(true);
             if(m_xessSystem->InitializeFrameGenerationForWindow(m_device.Get(),m_commandQueue.Get(),m_hwnd,desc,factory.Get())){m_xessSystem->GetFGSwapChain()->QueryInterface(IID_PPV_ARGS(&m_swapChain));m_frameGenProxyProvider=2;}
@@ -108,8 +112,8 @@ void Renderer::UpdateTechnologySwapChain(){
         m_backBufferState=D3D12_RESOURCE_STATE_PRESENT;
     }
     if(m_frameGenProxyProvider==1&&m_fidelityFXFrameGeneration){
-        if(m_fsrFrameGenEnabled){DXGI_SWAP_CHAIN_DESC1 desc{};m_swapChain->GetDesc1(&desc);ComPtr<IDXGIFactory2> factory;CreateDXGIFactory2(0,IID_PPV_ARGS(&factory));m_fsrFrameGenEnabled=m_fidelityFXFrameGeneration->Initialize(m_device.Get(),m_commandQueue.Get(),m_hwnd,desc,factory.Get(),m_width,m_height);}
-        else m_fidelityFXFrameGeneration->Disable();
+        if(m_fsrFrameGenEnabled && !m_fidelityFXFrameGeneration->MatchesDisplaySize(m_width,m_height)){DXGI_SWAP_CHAIN_DESC1 desc{};m_swapChain->GetDesc1(&desc);ComPtr<IDXGIFactory2> factory;CreateDXGIFactory2(0,IID_PPV_ARGS(&factory));m_fsrFrameGenEnabled=m_fidelityFXFrameGeneration->Initialize(m_device.Get(),m_commandQueue.Get(),m_hwnd,desc,factory.Get(),m_width,m_height);}
+        else if (!m_fsrFrameGenEnabled) m_fidelityFXFrameGeneration->Disable();
     }
     if(m_frameGenProxyProvider==2&&m_xessSystem)m_xessSystem->SetFrameGenEnabled(m_xessFrameGenEnabled);
     if(m_fsrFrameGenEnabled||m_xessFrameGenEnabled||m_dlssGRequested){
@@ -138,6 +142,7 @@ void Renderer::PrepareTechnologyFrame(float dt){
     if(m_fsrFrameGenEnabled){
         XMFLOAT4X4 inverse;XMStoreFloat4x4(&inverse,XMMatrixInverse(nullptr,m_camera->GetViewMatrix()));
         m_fsrFrameGenActive=m_fidelityFXFrameGeneration->Prepare(list,m_depthStencilBuffer.Get(),m_velocityTexture.Get(),m_frameGenHudless.Get(),m_frameCounter,m_renderWidth,m_renderHeight,m_camera->GetJitterX()*m_renderWidth*.5f,-m_camera->GetJitterY()*m_renderHeight*.5f,dt,XMConvertToRadians(m_fov),&inverse._41,&inverse._11,&inverse._21,&inverse._31);
+        m_fsrFrameGenStatus = m_fsrFrameGenActive ? "Active" : "Frame preparation failed (see editor log)";
         if(!m_fsrFrameGenActive)m_fsrFrameGenEnabled=false;
     }
     if(m_xessFrameGenEnabled){
@@ -152,6 +157,11 @@ void Renderer::PrepareTechnologyFrame(float dt){
         else{m_xessFrameGenEnabled=false;m_xessSystem->SetFrameGenEnabled(false);LOG("XeFG tagging failed; interpolation disabled");}
     }
     Transition(list,m_renderTargets[m_frameIndex].Get(),m_backBufferState,D3D12_RESOURCE_STATE_RENDER_TARGET);
+}
+
+uint64_t Renderer::GetGeneratedFrameCount() const {
+    const auto fsrFrames = m_fidelityFXFrameGeneration ? m_fidelityFXFrameGeneration->GeneratedFrames() : 0;
+    return m_dlssGeneratedFrames + m_xessGeneratedFrames + m_retiredFSRGeneratedFrames + fsrFrames;
 }
 
 void Renderer::FinishTechnologyPresent(){
@@ -201,5 +211,7 @@ void Renderer::WriteTechnologyState(const std::string& path){
     state<<"latency reflex_supported "<<m_reflexSupported<<" reflex_active "<<m_reflexActive<<" reflex_mode "<<int(m_reflexMode)<<" xell_supported "<<m_xellSupported<<" xell_enabled "<<m_xellEnabled<<" xell_active "<<m_xellActive<<'\n';
     state<<"content_io directstorage_reads "<<EngineStorage::directStorageReads<<" bytes "<<EngineStorage::directStorageBytes<<" gdeflate_textures "<<EngineStorage::streamingTextureReads<<" decoded_bytes "<<EngineStorage::gdeflateDecodedBytes<<'\n';
     state<<"storage "<<(m_directStorage?m_directStorage->GetStatusSummary():"offline")<<'\n';
-    state<<"graphics dxr_enabled "<<m_dxrEnabled<<" path_tracing "<<m_pathTracingEnabled<<'\n';
+    state<<"local_shadows spot_indices "<<m_constantBufferData.spotShadowIndices.x<<' '<<m_constantBufferData.spotShadowIndices.y
+        <<" point_indices "<<m_constantBufferData.pointShadowParams.x<<' '<<m_constantBufferData.pointShadowParams.y<<'\n';
+    state<<"graphics dxr_enabled "<<m_dxrEnabled<<" path_tracing "<<m_pathTracingEnabled<<" pt_samples "<<m_ptSamplesPerPixel<<'\n';
 }
